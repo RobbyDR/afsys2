@@ -9,19 +9,48 @@ class S2kicktugas extends CI_Controller
         $this->load->model(['sql']);
     }
     // ============================== MENU UTAMA
-    public function index()
+    public function index($tab = null)
     {
         $data['judul'] = "S2 Kick Tugas";
         $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();
         $data['getsubmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'submenu'], 'urutan ASC')->result_array();
 
-        // $data['get'] = $this->sql->select_table('tbl_s2kicktugas', null, 'id DESC')->result_array();
-        // function select_table_join($table, $column, $join_table, $join_on, $join, $where = array(1 => 1), $order_by = null)
-        $data['get'] = $this->sql->select_table_join('tbl_s2kicktugas', 'tbl_s2kicktugas.*,tbl_s2matkul.nama as namamatkul', 'tbl_s2matkul', 'tbl_s2matkul.id=tbl_s2kicktugas.matkulid', 'left', array(1 => 1), 'tbl_s2kicktugas.status ASC, tbl_s2kicktugas.deadline ASC')->result_array();
-        $data['getmatkulid'] = $this->sql->select_table('tbl_s2matkul', ['tbl_s2matkul.status' => '1'], 'id ASC')->result_array();
+        if ($tab == null) {
+            $data['tab'] = $this->sql->select_table('mst_sekolah', ['active' => 1])->row_array()['kode'];
+        } else {
+            $data['tab'] = $tab;
+        }
 
-        $data['progress'] = $this->sql->select_table('tbl_s2kicktugas', ['tbl_s2kicktugas.status' => '2'])->num_rows();
-        $data['progresstot'] = $this->sql->select_table('tbl_s2kicktugas')->num_rows();
+        $this->db->select('
+            tbl_s2kicktugas.*, 
+            tbl_s2matkul.nama as namamatkul,
+            mst_sekolah.kode
+            ');
+        $this->db->from('tbl_s2kicktugas');
+        $this->db->join('tbl_s2matkul', 'tbl_s2matkul.id = tbl_s2kicktugas.matkulid', 'left');
+        $this->db->join('mst_sekolah', 'mst_sekolah.kode = tbl_s2matkul.sekolah_kode', 'left');
+        // where array(1 => 1) bisa diabaikan, karena tidak berdampak
+        $this->db->where('mst_sekolah.kode', $data['tab']);
+        $this->db->order_by('tbl_s2kicktugas.status', 'ASC');
+        $this->db->order_by('tbl_s2kicktugas.deadline', 'ASC');
+
+        $data['get'] = $this->db->get()->result_array();
+
+        $data['getmatkulid'] = $this->sql->select_table('tbl_s2matkul', ['tbl_s2matkul.status' => '1'], 'id ASC')->result_array();
+        $data['getschool'] = $this->sql->select_table('mst_sekolah', ['mst_sekolah.status' => '1'], 'id ASC')->result_array();
+        $data['getschoolbytab'] = $this->sql->select_table('mst_sekolah', ['mst_sekolah.status' => '1', 'mst_sekolah.kode' => $tab], 'id ASC')->row_array();
+
+        $this->db->where('tbl_s2kicktugas.status', '2');
+        $this->db->join('tbl_s2matkul', 'tbl_s2matkul.id = tbl_s2kicktugas.matkulid', 'left');
+        $this->db->join('mst_sekolah', 'mst_sekolah.kode = tbl_s2matkul.sekolah_kode', 'left');
+        $this->db->where('mst_sekolah.kode', $data['tab']);
+        $data['progress'] = $this->db->get('tbl_s2kicktugas')->num_rows();
+
+        $this->db->join('tbl_s2matkul', 'tbl_s2matkul.id = tbl_s2kicktugas.matkulid', 'left');
+        $this->db->join('mst_sekolah', 'mst_sekolah.kode = tbl_s2matkul.sekolah_kode', 'left');
+        $this->db->where('mst_sekolah.kode', $data['tab']);
+        $data['progresstot'] = $this->db->get('tbl_s2kicktugas')->num_rows();
+
 
         $data['subview'] = "s2kicktugas/index";
         $this->load->view('partial', $data);
@@ -65,7 +94,46 @@ class S2kicktugas extends CI_Controller
     {
         if ($this->input->post()) {
             $data['get'] = $this->sql->select_table('tbl_s2kicktugas', ['id' => $this->input->post('id')])->row_array();
-            $data['getmatkulid'] = $this->sql->select_table('tbl_s2matkul', ['tbl_s2matkul.status' => '1'], 'id ASC')->result_array();
+
+            //---
+            $this->load->helper('penolong_helper');
+            // Ambil semua matkul aktif
+            // $this->db->where('status', '1');
+            // $this->db->order_by('id', 'ASC');
+            // $getmatkulid = $this->db->get('tbl_s2matkul')->result_array();
+
+            // // Cek apakah matkul lama ($get['matkulid']) ada di list aktif
+            // $exists = false;
+            // foreach ($getmatkulid as $row) {
+            //     if ($row['id'] == $data['get']['matkulid']) {
+            //         $exists = true;
+            //         break;
+            //     }
+            // }
+
+            // // Kalau belum ada, tambahkan secara manual
+            // if (!$exists && !empty($data['get']['matkulid'])) {
+            //     $matkul_lama = $this->db
+            //         ->where('id', $data['get']['matkulid'])
+            //         ->get('tbl_s2matkul')
+            //         ->row_array();
+
+            //     if ($matkul_lama) {
+            //         $getmatkulid[] = $matkul_lama; // tambahkan ke list
+            //     }
+            // }
+
+            // $data['getmatkulid'] = $getmatkulid;
+            $data['getmatkulid'] = get_dropdown_with_preserved_value(
+                $this->db,
+                'tbl_s2matkul',
+                ['status' => '1'],
+                $data['get']['matkulid'],       // preserve value
+                'id ASC'
+            );
+            //---
+
+
             $this->load->view('s2kicktugas/getedit', $data);
         } else {
             echo "elor";

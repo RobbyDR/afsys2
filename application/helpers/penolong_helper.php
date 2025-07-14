@@ -282,3 +282,41 @@ if (!function_exists('generate_unique_filename')) {
         // return $limited_name . $unique_code;
     }
 }
+
+
+if (!function_exists('get_dropdown_with_preserved_value')) {
+    /**
+     * Mengembalikan array hasil query yang difilter + nilai lama jika tidak masuk filter
+     *
+     * @param CI_DB_query_builder $db
+     * @param string $table Nama tabel
+     * @param array $filter Kondisi WHERE, contoh: ['status' => 1]
+     * @param string|int|null $preserve_id ID yang harus tetap muncul meskipun tidak masuk filter
+     * @param string $order_by Kolom untuk order (misal: 'id ASC')
+     * @return array
+     */
+    function get_dropdown_with_preserved_value($db, $table, $filter = [], $preserve_id = null, $order_by = 'id ASC')
+    {
+        // Ambil data aktif
+        if (!empty($filter)) {
+            $db->where($filter);
+        }
+
+        if (!empty($order_by)) {
+            $db->order_by($order_by);
+        }
+
+        $result = $db->get($table)->result_array();
+
+        // Cek apakah preserve_id sudah ada
+        $ids = array_column($result, 'id');
+        if ($preserve_id !== null && !in_array($preserve_id, $ids)) {
+            $preserve_row = $db->where('id', $preserve_id)->get($table)->row_array();
+            if ($preserve_row) {
+                $result[] = $preserve_row;
+            }
+        }
+
+        return $result;
+    }
+}

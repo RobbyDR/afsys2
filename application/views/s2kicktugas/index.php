@@ -10,12 +10,39 @@
             </div>
         </div>
 
+        <ul class="nav nav-tabs">
+            <!-- <li class="nav-item">
+                <a class="nav-link active" aria-current="page" href="#">Active</a>
+            </li>
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">Dropdown</a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#">Action</a></li>
+                    <li><a class="dropdown-item" href="#">Another action</a></li>
+                    <li><a class="dropdown-item" href="#">Something else here</a></li>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
+                    <li><a class="dropdown-item" href="#">Separated link</a></li>
+                </ul>
+            </li> -->
+
+            <?php foreach ($getschool as $school): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= $school['kode'] == $tab ? 'active' : '' ?>" href="<?= base_url('s2kicktugas/index/' . $school['kode']) ?>"><?= $school['kode'] ?></a>
+                </li>
+            <?php endforeach; ?>
+            <!-- <li class="nav-item">
+                <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Disabled</a>
+            </li> -->
+        </ul>
+
         <?php
         // Set timezone
         date_default_timezone_set('Asia/Jakarta');
 
         // Tanggal awal
-        $startDate = new DateTime('2024-09-17');
+        $startDate = new DateTime($getschoolbytab['start']);
         // Tanggal hari ini
         $endDate = new DateTime();
 
@@ -98,8 +125,8 @@
                     <div class="row">
                         <div class="mb-3 col">
                             <label for="matkulid" class="col-form-label">matkulid</label>
-                            <select class="form-select" name="matkulid">
-                                <option>---pilih---</option>
+                            <select class="form-select" name="matkulid" required>
+                                <option value="">---pilih---</option>
                                 <?php foreach ($getmatkulid as $row): ?>
                                     <option value="<?= $row['id'] ?>"><?= $row['nama'] ?></option>
                                 <?php endforeach; ?>
@@ -108,19 +135,19 @@
 
                         <div class="mb-3 col">
                             <label for="nama" class="col-form-label">nama</label>
-                            <input type="text" class="form-control" name="nama">
+                            <input type="text" class="form-control" name="nama" required>
                         </div>
                         <div class="mb-3 col">
                             <label for="tanggal" class="col-form-label">tanggal</label>
-                            <input type="date" class="form-control" name="tanggal" value=<?= date('Y-m-d') ?>>
+                            <input type="date" class="form-control" name="tanggal" value=<?= date('Y-m-d') ?> required>
                         </div>
                         <div class="mb-3 col">
                             <label for="deadline" class="col-form-label">deadline</label>
-                            <input type="date" class="form-control" name="deadline" value=<?= date('Y-m-d', strtotime(' +7 days')) ?>>
+                            <input type="date" class="form-control" name="deadline" value=<?= date('Y-m-d', strtotime(' +7 days')) ?> required>
                         </div>
                         <div class="mb-3 col">
                             <label for="selesai" class="col-form-label">selesai</label>
-                            <input type="date" class="form-control" name="selesai" ?>>
+                            <input type="date" class="form-control" name="selesai" ?>
                         </div>
                     </div>
                     <div class="row">
