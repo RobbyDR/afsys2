@@ -32,7 +32,19 @@ user_guide_src/cilexer/pycilexer.egg-info/*
 /tests/results/
 
 # UPLOAD
+# Upload folders – ignore files, keep folders
 upload/tkqkegiatan/*
+!upload/tkqkegiatan/.gitkeep
+
 upload/yramarsip/*
+!upload/yramarsip/.gitkeep
+
 upload/yramkegiatan/*
+!upload/yramkegiatan/.gitkeep
+
 upload/yramtugas/*
+!upload/yramtugas/.gitkeep
+
+# Optional: ignore general uploads
+# upload/*
+# !upload/.gitkeep
