@@ -38,7 +38,7 @@ class S2kicktugas extends CI_Controller
 
         $data['getmatkulid'] = $this->sql->select_table('tbl_s2matkul', ['tbl_s2matkul.status' => '1'], 'id ASC')->result_array();
         $data['getschool'] = $this->sql->select_table('mst_sekolah', ['mst_sekolah.status' => '1'], 'id ASC')->result_array();
-        $data['getschoolbytab'] = $this->sql->select_table('mst_sekolah', ['mst_sekolah.status' => '1', 'mst_sekolah.kode' => $tab], 'id ASC')->row_array();
+        $data['getschoolbytab'] = $this->sql->select_table('mst_sekolah', ['mst_sekolah.status' => '1', 'mst_sekolah.kode' => $data['tab']], 'id ASC')->row_array();
 
         $this->db->where('tbl_s2kicktugas.status', '2');
         $this->db->join('tbl_s2matkul', 'tbl_s2matkul.id = tbl_s2kicktugas.matkulid', 'left');

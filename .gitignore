@@ -45,6 +45,12 @@ upload/yramkegiatan/*
 upload/yramtugas/*
 !upload/yramtugas/.gitkeep
 
+upload/bblmcuti/*
+!upload/bblmcuti/.gitkeep
+
+upload/ttd/*
+!upload/ttd/.gitkeep
+
 # Optional: ignore general uploads
 # upload/*
 # !upload/.gitkeep

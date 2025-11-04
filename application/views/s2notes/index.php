@@ -19,9 +19,10 @@
                         <th scope="col">matkul</th>
                         <th scope="col">judul</th>
                         <th scope="col">tanggal</th>
+                        <th scope="col">isi</th>
                         <th scope="col">keterangan</th>
-                        <th scope="col">status</th>
-                        <th scope="col">aksi</th>
+                        <!-- <th scope="col">status</th> -->
+                        <th scope="col"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -32,8 +33,9 @@
                             <td><?= $row['namamatkul'] ?></td>
                             <td><?= $row['judul'] ?></td>
                             <td><?= $row['tanggal'] ?></td>
+                            <td><?= $row['isi'] ?></td>
                             <td><?= $row['keterangan'] ?></td>
-                            <td><?= $row['status'] ?></td>
+                            <!-- <td><?= $row['status'] ?></td> -->
                             <td>
                                 <div class="dropdown">
                                     <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -67,7 +69,7 @@
                     <div class="row">
                         <div class="mb-3 col">
                             <label for="matkulid" class="col-form-label">matkulid</label>
-                            <select class="form-select" name="matkulid">
+                            <select class="form-select" name="matkulid" id="matkulid">
                                 <option>---pilih---</option>
                                 <?php foreach ($getmatkulid as $row): ?>
                                     <option value="<?= $row['id'] ?>"><?= $row['nama'] ?></option>
@@ -179,9 +181,20 @@
             ],
             pageLength: -1,
             order: [
-                [6, 'asc'],
-                [4, 'asc']
+                [0, 'desc']
             ]
+        });
+    });
+</script>
+
+<script>
+    $(document).ready(function() {
+        $('#matkulid').select2({
+            dropdownParent: $('#tambahModal'),
+            // theme: 'bootstrap-5', // opsional, jika kamu mau menyesuaikan dengan Bootstrap 5
+            width: '100%',
+            placeholder: 'Pilih kategori...',
+            allowClear: true
         });
     });
 </script>

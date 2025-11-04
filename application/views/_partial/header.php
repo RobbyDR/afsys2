@@ -106,6 +106,51 @@
         }
     </style>
 
+    <style>
+        /* === Select2 Dark Theme === */
+        .select2-container--default .select2-selection--single {
+            background-color: #222 !important;
+            border: 1px solid #444 !important;
+            color: #eee !important;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            color: #eee !important;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__arrow b {
+            border-color: #aaa transparent transparent transparent !important;
+        }
+
+        /* Dropdown panel */
+        .select2-dropdown {
+            background-color: #1e1e1e !important;
+            border: 1px solid #444 !important;
+        }
+
+        /* Option items */
+        .select2-results__option {
+            background-color: #1e1e1e !important;
+            color: #ddd !important;
+        }
+
+        .select2-results__option--highlighted {
+            background-color: #2a2a2a !important;
+            color: #fff !important;
+        }
+
+        /* Placeholder text */
+        .select2-selection__placeholder {
+            color: #888 !important;
+        }
+
+        /* Focus outline */
+        .select2-container--default.select2-container--focus .select2-selection--single {
+            border-color: #666 !important;
+            box-shadow: 0 0 0 0.1rem rgba(255, 255, 255, 0.2);
+        }
+    </style>
+
 
     <!-- Custom styles for this template -->
     <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css" rel="stylesheet"> -->
@@ -113,6 +158,13 @@
     <link href="<?= base_url('') ?>assets/DataTables/datatables.min.css" rel="stylesheet">
     <link href="<?= base_url('') ?>assets/css/dashboard.css" rel="stylesheet">
     <link href="<?= base_url('') ?>assets/css/sidebars.css" rel="stylesheet">
+
+    <!-- Select2 CSS -->
+    <link href="<?= base_url('assets/select2/dist/css/select2.min.css') ?>" rel="stylesheet">
+
+    <!-- Select2 JS -->
+    <script src="<?= base_url('assets/select2/dist/js/select2.min.js') ?>"></script>
+
 </head>
 
 <body>

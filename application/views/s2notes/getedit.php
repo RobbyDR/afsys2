@@ -5,7 +5,7 @@
         <div class="row">
             <div class="mb-3 col">
                 <label for="matkulid" class="col-form-label">matkulid</label>
-                <select class="form-select" name="matkulid">
+                <select class="form-select" name="matkulid" id="matkulidedit">
                     <option>---pilih---</option>
                     <?php foreach ($getmatkulid as $row): ?>
                         <option <?= $row['id'] == $get['matkulid'] ? 'selected' : ''; ?> value="<?= $row['id'] ?>"><?= $row['nama'] ?></option>
@@ -51,3 +51,15 @@
         <button type="submit" class="btn btn-primary">Save</button>
     </div>
 </form>
+
+<script>
+    $(document).ready(function() {
+        $('#matkulidedit').select2({
+            dropdownParent: $('#editModal'),
+            // theme: 'bootstrap-5', // opsional, jika kamu mau menyesuaikan dengan Bootstrap 5
+            width: '100%',
+            placeholder: 'Pilih kategori...',
+            allowClear: true
+        });
+    });
+</script>

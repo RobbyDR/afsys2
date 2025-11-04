@@ -320,3 +320,137 @@ if (!function_exists('get_dropdown_with_preserved_value')) {
         return $result;
     }
 }
+
+if (!function_exists('get_masakerja')) {
+    function get_masakerja($nippegawai)
+    {
+        // // Ambil nilai nippegawai
+        // $nippegawai = '198712142015021001'; // Gantilah dengan nilai $get['nippegawai']
+
+        // Ambil bagian tanggal (201502) dari nippegawai
+        $tanggal = substr($nippegawai, 8, 6);
+
+        // Ekstrak tahun dan bulan
+        $tahun = substr($tanggal, 0, 4);
+        $bulan = substr($tanggal, 4, 2);
+
+        // Buat objek DateTime untuk tanggal mulai dan tanggal saat ini
+        $tanggal_mulai = new DateTime("$tahun-$bulan-01");
+        $tanggal_sekarang = new DateTime();
+
+        // Hitung selisih waktu
+        $interval = $tanggal_mulai->diff($tanggal_sekarang);
+
+        // Format hasilnya menjadi "X Tahun Y Bulan"
+        $masakerja = $interval->y . " Tahun " . $interval->m . " Bulan";
+
+        // Menampilkan hasil
+        // echo $masakerja;
+
+        return $masakerja;
+    }
+}
+
+if (!function_exists('get_jumlahcuti')) {
+    function get_jumlahcuti($tgl1, $tgl2)
+    {
+        $start = new DateTime($tgl1);
+        $end = new DateTime($tgl2);
+        $end->modify('+1 day'); // agar tanggal akhir ikut dihitung
+
+        $interval = new DateInterval('P1D');
+        $dateRange = new DatePeriod($start, $interval, $end);
+
+        // Daftar hari libur nasional (format: YYYY-MM-DD)
+        $liburNasional = [
+            '2025-01-01', // Tahun Baru
+            '2025-03-31', // Nyepi
+            '2025-04-18', // Wafat Isa Almasih
+            '2025-05-01', // Hari Buruh
+            '2025-05-29', // Kenaikan Isa Almasih
+            '2025-06-01', // Hari Lahir Pancasila
+            '2025-06-05', // Idul Adha
+            '2025-07-28', // Tahun Baru Islam
+            '2025-08-17', // Hari Kemerdekaan
+            '2025-10-06', // Maulid Nabi
+            '2025-12-25', // Natal
+        ];
+
+        $jumlahCuti = 0;
+
+        foreach ($dateRange as $date) {
+            $day = $date->format('N'); // 1 = Senin, ..., 7 = Minggu
+            $tanggal = $date->format('Y-m-d');
+
+            if ($day < 6 && !in_array($tanggal, $liburNasional)) {
+                $jumlahCuti++;
+            }
+        }
+
+        return $jumlahCuti;
+    }
+}
+
+
+if (!function_exists('get_angkaketulisan')) {
+    function get_angkaketulisan($angka)
+    {
+        $angka = abs($angka);
+        $bilangan = [
+            "",
+            "satu",
+            "dua",
+            "tiga",
+            "empat",
+            "lima",
+            "enam",
+            "tujuh",
+            "delapan",
+            "sembilan",
+            "sepuluh",
+            "sebelas"
+        ];
+
+        $tulisan = "";
+
+        if ($angka < 12) {
+            $tulisan = $bilangan[$angka];
+        } elseif ($angka < 20) {
+            $tulisan = get_angkaketulisan($angka - 10) . " belas";
+        } elseif ($angka < 100) {
+            $tulisan = get_angkaketulisan(floor($angka / 10)) . " puluh";
+            if ($angka % 10 != 0) {
+                $tulisan .= " " . get_angkaketulisan($angka % 10);
+            }
+        } elseif ($angka < 200) {
+            $tulisan = "seratus";
+            if ($angka - 100 != 0) {
+                $tulisan .= " " . get_angkaketulisan($angka - 100);
+            }
+        } elseif ($angka < 1000) {
+            $tulisan = get_angkaketulisan(floor($angka / 100)) . " ratus";
+            if ($angka % 100 != 0) {
+                $tulisan .= " " . get_angkaketulisan($angka % 100);
+            }
+        } elseif ($angka < 2000) {
+            $tulisan = "seribu";
+            if ($angka - 1000 != 0) {
+                $tulisan .= " " . get_angkaketulisan($angka - 1000);
+            }
+        } elseif ($angka < 1000000) {
+            $tulisan = get_angkaketulisan(floor($angka / 1000)) . " ribu";
+            if ($angka % 1000 != 0) {
+                $tulisan .= " " . get_angkaketulisan($angka % 1000);
+            }
+        } elseif ($angka < 1000000000) {
+            $tulisan = get_angkaketulisan(floor($angka / 1000000)) . " juta";
+            if ($angka % 1000000 != 0) {
+                $tulisan .= " " . get_angkaketulisan($angka % 1000000);
+            }
+        } else {
+            $tulisan = "Angka terlalu besar";
+        }
+
+        return trim($tulisan);
+    }
+}

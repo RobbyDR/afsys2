@@ -37,7 +37,7 @@
                 <tbody>
                     <?php foreach ($get as $row): ?>
                         <!-- class="text-decoration-line-through" -->
-                        <tr class="<?= $row['status'] == "2" ? 'fw-lighter' : ''; ?>">
+                        <tr class="<?= $row['status'] == "2" ? 'text-muted text-decoration-line-through' : ''; ?>">
                             <td><?= $row['id'] ?></td>
                             <td><?= $row['nama'] ?></td>
                             <td><?= $row['deskripsi'] ?></td>

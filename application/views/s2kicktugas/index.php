@@ -81,10 +81,12 @@
                     </tr>
                 </thead>
                 <tbody>
+                    <?php $no = 0 ?>
                     <?php foreach ($get as $row): ?>
+                        <?php $no++ ?>
                         <!-- class="text-decoration-line-through" -->
-                        <tr class="<?= $row['status'] == "2" ? 'fw-lighter' : ''; ?>">
-                            <td><?= $row['id'] ?></td>
+                        <tr class="<?= $row['status'] == "2" ? 'fw-lighter text-decoration-line-through' : ''; ?>">
+                            <td><?= $no ?></td>
                             <td><?= $row['namamatkul'] ?></td>
                             <td><?= $row['nama'] ?></td>
                             <td><?= $row['deskripsi'] ?></td>
@@ -246,7 +248,8 @@
             pageLength: -1,
             order: [
                 [7, 'asc'],
-                [5, 'desc']
+                [5, 'desc'],
+                [4, 'desc']
             ]
         });
     });
