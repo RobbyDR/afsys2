@@ -48,6 +48,12 @@ $tanggal = (int)$baseDate->format('d');
                     title="goto jurnal keuangan">
                     Jurnal
                 </a>
+                <a href="#" id="grafik"
+                    rel="noopener noreferrer"
+                    class="btn btn-sm btn-outline-warning"
+                    title="goto grafik keuangan">
+                    <span data-feather="pie-chart"></span>
+                </a>
                 <a href="#" id="updaterekap"
                     rel="noopener noreferrer"
                     class="btn btn-sm btn-outline-warning"
@@ -315,6 +321,9 @@ $tanggal = (int)$baseDate->format('d');
         });
         $("#dashboard").on("click", function() {
             window.location.href = '<?= base_url('afk') ?>';
+        });
+        $("#grafik").on("click", function() {
+            window.location.href = '<?= base_url('afk/grafik') ?>';
         });
     });
 </script>

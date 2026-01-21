@@ -951,4 +951,352 @@ class Afk extends CI_Controller
         // die;
         $this->load->view('afk/insightview', $data);
     }
+
+    public function grafik()
+    {
+        $data['judul'] = 'Grafik';
+
+        $data['getmenu'] = $this->sql->select_table(
+            'tbl_devmenuaf',
+            ['status' => '1', 'jenis' => 'menu'],
+            'urutan ASC'
+        )->result_array();
+
+        $data['getsubmenu'] = $this->sql->select_table(
+            'tbl_devmenuaf',
+            ['status' => '1', 'jenis' => 'submenu'],
+            'urutan ASC'
+        )->result_array();
+
+        $data['subview'] = 'afk/grafik';
+        $this->load->view('partial', $data);
+    }
+
+
+    // public function grafik_data($scale = 'bulanan')
+    // {
+    //     // ==========================
+    //     // VALIDASI SCALE
+    //     // ==========================
+    //     $allowed = ['harian', 'bulanan', 'tahunan'];
+    //     if (!in_array($scale, $allowed)) {
+    //         show_error('Scale tidak valid');
+    //     }
+
+    //     // ==========================
+    //     // RANGE WAKTU
+    //     // ==========================
+    //     $start = '2023-12-01';
+    //     $end   = date('Y-m-d');
+
+    //     // ==========================
+    //     // KONFIGURASI PER SCALE
+    //     // ==========================
+    //     switch ($scale) {
+    //         case 'harian':
+    //             $selectWaktu = "DATE(r.waktu)";
+    //             $labelAlias  = 'label';
+    //             $groupBy     = "DATE(r.waktu)";
+    //             break;
+
+    //         case 'tahunan':
+    //             $selectWaktu = "YEAR(r.waktu)";
+    //             $labelAlias  = 'label';
+    //             $groupBy     = "YEAR(r.waktu)";
+    //             break;
+
+    //         default: // bulanan
+    //             $selectWaktu = "DATE_FORMAT(r.waktu,'%Y-%m')";
+    //             $labelAlias  = 'label';
+    //             $groupBy     = "YEAR(r.waktu), MONTH(r.waktu)";
+    //     }
+
+    //     // ==========================
+    //     // BASE QUERY
+    //     // ==========================
+    //     $base = $this->db
+    //         ->select("
+    //         {$selectWaktu} AS {$labelAlias},
+    //         SUM(CAST(r.nilai AS SIGNED)) AS total
+    //     ")
+    //         ->from('tbl_afkrekap r')
+    //         ->join('tbl_afkcat c', 'c.id = r.jenis')
+    //         ->where('r.jeniswaktu', $scale)
+    //         ->where('c.visibility', 1)
+    //         ->where('r.waktu >=', $start)
+    //         ->where('r.waktu <=', $end)
+    //         ->group_by($groupBy)
+    //         ->order_by($groupBy, 'ASC');
+
+    //     // ==========================
+    //     // DATA IN & OUT
+    //     // ==========================
+    //     $in  = (clone $base)->where('c.io', 'i')->get()->result_array();
+    //     $out = (clone $base)->where('c.io', 'o')->get()->result_array();
+
+    //     // ==========================
+    //     // NORMALISASI LABEL
+    //     // ==========================
+    //     $labels = [];
+    //     $mapIn  = [];
+    //     $mapOut = [];
+
+    //     foreach ($in as $r) {
+    //         $mapIn[$r['label']] = (float)$r['total'];
+    //         $labels[] = $r['label'];
+    //     }
+
+    //     foreach ($out as $r) {
+    //         $mapOut[$r['label']] = abs((float)$r['total']);
+    //         if (!in_array($r['label'], $labels)) {
+    //             $labels[] = $r['label'];
+    //         }
+    //     }
+
+    //     sort($labels);
+
+    //     // ==========================
+    //     // DATASET
+    //     // ==========================
+    //     $dataIn = $dataOut = $dataSaldo = $dataAkumulasi = [];
+    //     $running = 0;
+
+    //     foreach ($labels as $label) {
+    //         $inVal  = $mapIn[$label]  ?? 0;
+    //         $outVal = $mapOut[$label] ?? 0;
+    //         $saldo  = $inVal - $outVal;
+
+    //         $running += $saldo;
+
+    //         $dataIn[]         = $inVal;
+    //         $dataOut[]        = $outVal;
+    //         $dataSaldo[]      = $saldo;
+    //         $dataAkumulasi[]  = $running;
+    //     }
+
+    //     // ==========================
+    //     // RESPONSE JSON
+    //     // ==========================
+    //     $this->output
+    //         ->set_content_type('application/json')
+    //         ->set_output(json_encode([
+    //             'scale'      => $scale,
+    //             'labels'     => $labels,
+    //             'in'         => $dataIn,
+    //             'out'        => $dataOut,
+    //             'saldo'      => $dataSaldo,
+    //             'akumulasi'  => $dataAkumulasi
+    //         ]));
+    // }
+
+    public function grafik_data($scale = 'bulanan')
+    {
+        // ==========================
+        // VALIDASI SCALE
+        // ==========================
+        $allowed = ['harian', 'bulanan', 'tahunan'];
+        if (!in_array($scale, $allowed)) {
+            show_error('Scale tidak valid');
+        }
+
+        $start = '2023-12-01'; // sistem mulai
+        $end   = date('Y-m-d');
+
+        // ==========================
+        // 1️⃣ DATA HARIAN (SOURCE OF TRUTH)
+        // ==========================
+        $dailyBase = $this->db
+            ->select("
+            DATE(r.waktu) AS label,
+            SUM(CAST(r.nilai AS SIGNED)) AS total
+        ")
+            ->from('tbl_afkrekap r')
+            ->join('tbl_afkcat c', 'c.id = r.jenis')
+            ->where('r.jeniswaktu', 'harian')
+            ->where('c.visibility', 1)
+            ->where('r.waktu >=', $start)
+            ->where('r.waktu <=', $end)
+            ->group_by('DATE(r.waktu)')
+            ->order_by('DATE(r.waktu)', 'ASC');
+
+        $inDaily  = (clone $dailyBase)->where('c.io', 'i')->get()->result_array();
+        $outDaily = (clone $dailyBase)->where('c.io', 'o')->get()->result_array();
+
+        // ==========================
+        // MAP HARIAN
+        // ==========================
+        $mapIn = $mapOut = [];
+        $labelsDaily = [];
+
+        foreach ($inDaily as $r) {
+            $mapIn[$r['label']] = (float)$r['total'];
+            $labelsDaily[] = $r['label'];
+        }
+
+        foreach ($outDaily as $r) {
+            $mapOut[$r['label']] = abs((float)$r['total']);
+            if (!in_array($r['label'], $labelsDaily)) {
+                $labelsDaily[] = $r['label'];
+            }
+        }
+
+        sort($labelsDaily);
+
+        // ==========================
+        // SALDO & AKUMULASI (DOMPET)
+        // ==========================
+        $dailySaldo = [];
+        $dailyAkumulasi = [];
+        $running = 0;
+
+        foreach ($labelsDaily as $tgl) {
+            $in  = $mapIn[$tgl]  ?? 0;
+            $out = $mapOut[$tgl] ?? 0;
+
+            $saldo = $in - $out;
+            $running += $saldo;
+
+            $dailySaldo[$tgl] = $saldo;
+            $dailyAkumulasi[$tgl] = $running;
+        }
+
+        // ==========================
+        // 2️⃣ DATA TAMPILAN (BULANAN / TAHUNAN)
+        // ==========================
+        switch ($scale) {
+            case 'harian':
+                $labels = $labelsDaily;
+                break;
+
+            case 'tahunan':
+                $labels = array_unique(array_map(fn($d) => substr($d, 0, 4), $labelsDaily));
+                break;
+
+            default: // bulanan
+                $labels = array_unique(array_map(fn($d) => substr($d, 0, 7), $labelsDaily));
+        }
+
+        sort($labels);
+
+        $dataIn = $dataOut = $dataSaldo = $dataAkumulasi = [];
+
+        foreach ($labels as $label) {
+
+            // filter harian sesuai skala
+            $matchedDates = array_filter($labelsDaily, function ($d) use ($label, $scale) {
+                if ($scale === 'harian')  return $d === $label;
+                if ($scale === 'tahunan') return substr($d, 0, 4) === $label;
+                return substr($d, 0, 7) === $label; // bulanan
+            });
+
+            $in = $out = 0;
+            foreach ($matchedDates as $d) {
+                $in  += $mapIn[$d]  ?? 0;
+                $out += $mapOut[$d] ?? 0;
+            }
+
+            $saldo = $in - $out;
+
+            // ⬇️ AKUMULASI DIAMBIL DARI HARIAN (KUNCI)
+            $lastDate = end($matchedDates);
+            $akumulasi = $dailyAkumulasi[$lastDate] ?? 0;
+
+            $dataIn[] = $in;
+            $dataOut[] = $out;
+            $dataSaldo[] = $saldo;
+            $dataAkumulasi[] = $akumulasi;
+        }
+
+        // ==========================
+        // RESPONSE
+        // ==========================
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode([
+                'scale'      => $scale,
+                'labels'     => $labels,
+                'in'         => $dataIn,
+                'out'        => $dataOut,
+                'saldo'      => $dataSaldo,
+                'akumulasi'  => $dataAkumulasi
+            ]));
+    }
+
+    public function grafik_akumulasi($scale = 'bulanan')
+    {
+        // ==========================
+        // VALIDASI SCALE
+        // ==========================
+        $allowed = ['harian', 'bulanan', 'tahunan'];
+        if (!in_array($scale, $allowed)) {
+            show_error('Scale tidak valid');
+        }
+
+        // ==========================
+        // RANGE WAKTU (SINGLE SOURCE)
+        // ==========================
+        $start = '2023-12-09';
+        $end   = date('Y-m-d');
+
+        // ==========================
+        // KONFIGURASI PER SCALE
+        // ==========================
+        switch ($scale) {
+            case 'harian':
+                $periodeSelect = "DATE(m.tanggal)";
+                $periodeGroup  = "DATE(tanggal)";
+                break;
+
+            case 'tahunan':
+                $periodeSelect = "YEAR(m.tanggal)";
+                $periodeGroup  = "YEAR(tanggal)";
+                break;
+
+            default: // bulanan
+                $periodeSelect = "DATE_FORMAT(m.tanggal,'%Y-%m')";
+                $periodeGroup  = "YEAR(tanggal), MONTH(tanggal)";
+        }
+
+        // ==========================
+        // QUERY INTI (SALDO TERAKHIR PER PERIODE)
+        // ==========================
+        $sql = "
+        SELECT
+            {$periodeSelect} AS label,
+            m.saldo
+        FROM tbl_afkmain m
+        INNER JOIN (
+            SELECT
+                MAX(id) AS last_id
+            FROM tbl_afkmain
+            WHERE tanggal BETWEEN ? AND ?
+            GROUP BY {$periodeGroup}
+        ) x ON x.last_id = m.id
+        ORDER BY label ASC
+    ";
+
+        $rows = $this->db->query($sql, [$start, $end])->result_array();
+
+        // ==========================
+        // DATASET
+        // ==========================
+        $labels = [];
+        $data   = [];
+
+        foreach ($rows as $r) {
+            $labels[] = $r['label'];
+            $data[]   = (float) $r['saldo'];
+        }
+
+        // ==========================
+        // RESPONSE JSON
+        // ==========================
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode([
+                'scale'     => $scale,
+                'labels'    => $labels,
+                'akumulasi' => $data
+            ]));
+    }
 }

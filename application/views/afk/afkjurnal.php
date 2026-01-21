@@ -43,6 +43,12 @@
                         title="goto insight">
                         Insight
                     </a>
+                    <a href="#" id="grafik"
+                        rel="noopener noreferrer"
+                        class="btn btn-sm btn-outline-warning"
+                        title="goto grafik keuangan">
+                        <span data-feather="pie-chart"></span>
+                    </a>
                     <a href="#" id="updatesaldo"
                         rel="noopener noreferrer"
                         class="btn btn-sm btn-outline-warning"
@@ -301,6 +307,9 @@
         });
         $("#dashboard").on("click", function() {
             window.location.href = '<?= base_url('afk') ?>';
+        });
+        $("#grafik").on("click", function() {
+            window.location.href = '<?= base_url('afk/grafik') ?>';
         });
     });
 </script>

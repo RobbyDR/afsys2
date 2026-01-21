@@ -12,6 +12,12 @@
                     <button type="button" id="insight" class="btn btn-sm btn-warning" title="Insight">Insight</button>
                     <button type="button" id="jurnalkeuangan" class="btn btn-sm btn-primary" title="Jurnal Keuangan">Jurnal Keuangan</button>
                     <div class="btn-group" role="group">
+                        <a href="#" id="grafik"
+                            rel="noopener noreferrer"
+                            class="btn btn-sm btn-primary"
+                            title="goto grafik keuangan">
+                            <span data-feather="pie-chart"></span>
+                        </a>
                         <button id="btnGroupDrop1" type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                             <!-- <i data-feather="refresh-ccw"></i> -->
                             <span data-feather="refresh-ccw" class="align-text-bottom"></span>
@@ -196,7 +202,9 @@
         $("#insight").on("click", function() {
             window.location.href = '<?= base_url('afk/insight') ?>';
         });
-
+        $("#grafik").on("click", function() {
+            window.location.href = '<?= base_url('afk/grafik') ?>';
+        });
         $("#updaterekap").click(() => window.location.href = '<?= base_url('afk/afkupdaterekap') ?>');
         $("#updaterekap2").click(() => window.location.href = '<?= base_url('afk/afkupdaterekapbulanan') ?>');
         $("#updaterekap3").click(() => window.location.href = '<?= base_url('afk/afkupdaterekaplampau') ?>');

@@ -1,5 +1,25 @@
 {
   "dependencies": {
+    "chart.js": "^4.5.1",
     "sweetalert2": "^11.14.3"
-  }
+  },
+  "name": "afsys2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RobbyDR/afsys2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/RobbyDR/afsys2/issues"
+  },
+  "homepage": "https://github.com/RobbyDR/afsys2#readme"
 }
