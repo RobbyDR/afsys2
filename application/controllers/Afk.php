@@ -180,6 +180,7 @@ class Afk extends CI_Controller
     public function afkrefreshallsaldo()
     {
         $this->Afk_mod->afkrefreshallsaldo();
+        $this->afkupdaterekap(); //sekalian
         $this->session->set_flashdata('success', 'Berhasil refresh saldo');
         redirect("afk/afkjurnal");
     }
@@ -486,151 +487,438 @@ class Afk extends CI_Controller
         $this->load->view('partial', $data);
     }
 
-    public function insight($tahun = null, $bulan = null)
+    public function insight($tanggalUrl = null)
     {
-        // RT Bulan
-        // Jika $tahun atau $bulan tidak diberikan, gunakan nilai default (tahun dan bulan saat ini)
-        $tahun = $tahun ?? date('Y');
-        $bulan = $bulan ?? date('m');
+        // =====================================================
+        // 1. SINGLE SOURCE OF TRUTH : DATE OBJECT
+        // =====================================================
+        try {
+            $date = new DateTime($tanggalUrl ?? date('Y-m-d'));
+        } catch (Exception $e) {
+            show_404();
+        }
 
-        // Tentukan tanggal pertama bulan ini dan tahun ini
-        $waktu = date("$tahun-$bulan-01");
-        $waktutahun = date("$tahun-01-01");
+        // =====================================================
+        // 2. DERIVASI WAKTU
+        // =====================================================
+        $tahun   = $date->format('Y');
+        $bulan   = $date->format('m');
+        $tanggal = $date->format('d');
 
-        // Simpan bulan dan tahun dalam array data
-        $data['bulan'] = $bulan;
-        $data['tahun'] = $tahun;
+        $waktuhari  = $date->format('Y-m-d');
+        $waktuBulan = $date->format('Y-m-01');
+        $waktuTahun = $date->format('Y-01-01');
 
+        $data['tanggal'] = (int) $tanggal;
+        $data['bulan']   = (int) $bulan;
+        $data['tahun']   = (int) $tahun;
 
-        $where = [
-            'tbl_afkrekap.jeniswaktu' => 'bulanan',
-            'tbl_afkrekap.waktu' => $waktu,
-            'tbl_afkcat.io' => 'o'
-        ];
-        $column = 'tbl_afkrekap.jenis as jenis,
-        tbl_afkrekap.nilai as nilai,
-        tbl_afkcat.deskripsi as deskripsi,
-        tbl_afkcat.cat as cat';
+        $data['tanggal_full'] = $date->format('Y-m-d');
+
+        // =====================================================
+        // 3. KONFIG UMUM QUERY
+        // =====================================================
+        $column = '
+        tbl_afkrekap.jenis  AS jenis,
+        tbl_afkrekap.nilai  AS nilai,
+        tbl_afkcat.deskripsi AS deskripsi,
+        tbl_afkcat.cat      AS cat
+    ';
         $order_by = 'CONVERT(nilai, SIGNED) ASC';
-        $data['get'] = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
-        // RT Tahun
-        // $waktutahun = date('Y-01-01');
-        $wheretahun = [
-            'tbl_afkrekap.jeniswaktu' => 'tahunan',
-            'tbl_afkrekap.waktu' => $waktutahun,
-            'tbl_afkcat.io' => 'o'
-        ];
-        $data['gettahun'] = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $wheretahun, $order_by)->result_array();
-        //RT 4EVER
-        $wher4ever = [
-            'tbl_afkrekap.jeniswaktu' => '4ever',
-            'tbl_afkcat.io' => 'o'
-        ];
-        $data['get4ever'] = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $wher4ever, $order_by)->result_array();
 
-        // Tab Bulan
-        //OUT
-        $a = 0;
-        foreach ($data['get'] as $row) :
-            if (isset($row['nilai']) && is_numeric($row['nilai'])) {
-                $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
-            }
-        endforeach;
-        $data['OUTbulan'] = $a;
-        //IN
-        $where = [
-            'tbl_afkrekap.jeniswaktu' => 'bulanan',
-            'tbl_afkrekap.waktu' => $waktu,
-            'tbl_afkcat.io' => 'i'
-        ];
-        $column = 'tbl_afkrekap.nilai as nilai,
-        tbl_afkcat.deskripsi as deskripsi,
-        tbl_afkcat.cat as cat';
-        $order_by = 'CONVERT(nilai, SIGNED) ASC';
-        $query = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
+        // =====================================================
+        // 4. HARIAN
+        // =====================================================
+        $data['gethari'] = $this->sql->select_table_join(
+            'tbl_afkrekap',
+            $column,
+            'tbl_afkcat',
+            'tbl_afkcat.id = tbl_afkrekap.jenis',
+            'LEFT',
+            [
+                'tbl_afkrekap.jeniswaktu' => 'harian',
+                'tbl_afkrekap.waktu'      => $waktuhari,
+                'tbl_afkcat.io'           => 'o'
+            ],
+            $order_by
+        )->result_array();
 
-        $a = 0;
-        foreach ($query as $row) :
-            if (isset($row['nilai']) && is_numeric($row['nilai'])) {
-                $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
-            }
-        endforeach;
-        $data['INbulan'] = $a;
+        $data['OUThari'] = array_sum(array_column($data['gethari'], 'nilai'));
+
+        $data['INhari'] = array_sum(array_column(
+            $this->sql->select_table_join(
+                'tbl_afkrekap',
+                'tbl_afkrekap.nilai AS nilai',
+                'tbl_afkcat',
+                'tbl_afkcat.id = tbl_afkrekap.jenis',
+                'LEFT',
+                [
+                    'tbl_afkrekap.jeniswaktu' => 'harian',
+                    'tbl_afkrekap.waktu'      => $waktuhari,
+                    'tbl_afkcat.io'           => 'i'
+                ]
+            )->result_array(),
+            'nilai'
+        ));
+
+        $data['SALDOhari'] = $data['INhari'] + $data['OUThari'];
+
+        // =====================================================
+        // 5. BULANAN
+        // =====================================================
+        $data['get'] = $this->sql->select_table_join(
+            'tbl_afkrekap',
+            $column,
+            'tbl_afkcat',
+            'tbl_afkcat.id = tbl_afkrekap.jenis',
+            'LEFT',
+            [
+                'tbl_afkrekap.jeniswaktu' => 'bulanan',
+                'tbl_afkrekap.waktu'      => $waktuBulan,
+                'tbl_afkcat.io'           => 'o'
+            ],
+            $order_by
+        )->result_array();
+
+        $data['OUTbulan'] = array_sum(array_column($data['get'], 'nilai'));
+
+        $data['INbulan'] = array_sum(array_column(
+            $this->sql->select_table_join(
+                'tbl_afkrekap',
+                'tbl_afkrekap.nilai AS nilai',
+                'tbl_afkcat',
+                'tbl_afkcat.id = tbl_afkrekap.jenis',
+                'LEFT',
+                [
+                    'tbl_afkrekap.jeniswaktu' => 'bulanan',
+                    'tbl_afkrekap.waktu'      => $waktuBulan,
+                    'tbl_afkcat.io'           => 'i'
+                ]
+            )->result_array(),
+            'nilai'
+        ));
 
         $data['SALDObulan'] = $data['INbulan'] + $data['OUTbulan'];
 
-        // Tab Tahun
-        //OUT
-        $a = 0;
-        foreach ($data['gettahun'] as $row) :
-            if (isset($row['nilai']) && is_numeric($row['nilai'])) {
-                $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
-            }
-        endforeach;
-        $data['OUTtahun'] = $a;
-        //IN
-        $where = [
-            'tbl_afkrekap.jeniswaktu' => 'tahunan',
-            'tbl_afkrekap.waktu' => $waktutahun,
-            'tbl_afkcat.io' => 'i'
-        ];
-        $column = 'tbl_afkrekap.nilai as nilai,
-        tbl_afkcat.deskripsi as deskripsi,
-        tbl_afkcat.cat as cat';
-        $order_by = 'CONVERT(nilai, SIGNED) ASC';
-        $query = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
+        // =====================================================
+        // 6. TAHUNAN
+        // =====================================================
+        $data['gettahun'] = $this->sql->select_table_join(
+            'tbl_afkrekap',
+            $column,
+            'tbl_afkcat',
+            'tbl_afkcat.id = tbl_afkrekap.jenis',
+            'LEFT',
+            [
+                'tbl_afkrekap.jeniswaktu' => 'tahunan',
+                'tbl_afkrekap.waktu'      => $waktuTahun,
+                'tbl_afkcat.io'           => 'o'
+            ],
+            $order_by
+        )->result_array();
 
-        $a = 0;
-        foreach ($query as $row) :
-            if (isset($row['nilai']) && is_numeric($row['nilai'])) {
-                $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
-            }
-        endforeach;
-        $data['INtahun'] = $a;
+        $data['OUTtahun'] = array_sum(array_column($data['gettahun'], 'nilai'));
+
+        $data['INtahun'] = array_sum(array_column(
+            $this->sql->select_table_join(
+                'tbl_afkrekap',
+                'tbl_afkrekap.nilai AS nilai',
+                'tbl_afkcat',
+                'tbl_afkcat.id = tbl_afkrekap.jenis',
+                'LEFT',
+                [
+                    'tbl_afkrekap.jeniswaktu' => 'tahunan',
+                    'tbl_afkrekap.waktu'      => $waktuTahun,
+                    'tbl_afkcat.io'           => 'i'
+                ]
+            )->result_array(),
+            'nilai'
+        ));
 
         $data['SALDOtahun'] = $data['INtahun'] + $data['OUTtahun'];
 
-        //TAB 4EVER
-        //OUT
-        $a1 = 0;
-        foreach ($data['get4ever'] as $row) :
-            if (isset($row['nilai']) && is_numeric($row['nilai'])) {
-                $a1 += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
-            }
-        endforeach;
-        $data['OUT4ever'] = $a1;
-        //IN
-        $where = [
-            'tbl_afkrekap.jeniswaktu' => 'tahunan',
-            'tbl_afkcat.io' => 'i'
-        ];
-        $column = 'tbl_afkrekap.nilai as nilai,
-            tbl_afkcat.deskripsi as deskripsi,
-            tbl_afkcat.cat as cat';
-        $order_by = 'CONVERT(nilai, SIGNED) ASC';
-        $query = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
+        // =====================================================
+        // 7. 4EVER
+        // =====================================================
+        $data['get4ever'] = $this->sql->select_table_join(
+            'tbl_afkrekap',
+            $column,
+            'tbl_afkcat',
+            'tbl_afkcat.id = tbl_afkrekap.jenis',
+            'LEFT',
+            [
+                'tbl_afkrekap.jeniswaktu' => '4ever',
+                'tbl_afkcat.io'           => 'o'
+            ],
+            $order_by
+        )->result_array();
 
-        $a2 = 0;
-        foreach ($query as $row) :
-            if (isset($row['nilai']) && is_numeric($row['nilai'])) {
-                $a2 += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
-            }
-        endforeach;
-        $data['IN4ever'] = $a2;
+        $data['OUT4ever'] = array_sum(array_column($data['get4ever'], 'nilai'));
+
+        $data['IN4ever'] = array_sum(array_column(
+            $this->sql->select_table_join(
+                'tbl_afkrekap',
+                'tbl_afkrekap.nilai AS nilai',
+                'tbl_afkcat',
+                'tbl_afkcat.id = tbl_afkrekap.jenis',
+                'LEFT',
+                [
+                    'tbl_afkrekap.jeniswaktu' => '4ever',
+                    'tbl_afkcat.io'           => 'i'
+                ]
+            )->result_array(),
+            'nilai'
+        ));
 
         $data['SALDO4ever'] = $data['IN4ever'] + $data['OUT4ever'];
 
-        $data['judul'] = "Wawasan";
-        $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();
-        $data['getsubmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'submenu'], 'urutan ASC')->result_array();
-        $data['subview'] = "afk/insight";
+        // =====================================================
+        // 8. VIEW
+        // =====================================================
+        $data['judul'] = 'Wawasan';
+        $data['getmenu'] = $this->sql->select_table(
+            'tbl_devmenuaf',
+            ['status' => '1', 'jenis' => 'menu'],
+            'urutan ASC'
+        )->result_array();
+
+        $data['getsubmenu'] = $this->sql->select_table(
+            'tbl_devmenuaf',
+            ['status' => '1', 'jenis' => 'submenu'],
+            'urutan ASC'
+        )->result_array();
+
+        $data['subview'] = 'afk/insight';
         $this->load->view('partial', $data);
     }
+
+
+    // public function insight($tahun = null, $bulan = null, $tanggal = null)
+    // {
+    //     // RT Bulan
+    //     // Jika $tahun atau $bulan tidak diberikan, gunakan nilai default (tahun dan bulan saat ini)
+    //     $tahun = $tahun ?? date('Y');
+    //     $bulan = $bulan ?? date('m');
+    //     $tanggal = $tanggal ?? date('d');
+    //     $waktuhari = date("$tahun-$bulan-$tanggal");
+
+    //     // Tentukan tanggal pertama bulan ini dan tahun ini
+    //     $waktu = date("$tahun-$bulan-01");
+    //     $waktutahun = date("$tahun-01-01");
+
+    //     // Simpan bulan dan tahun dalam array data
+    //     $data['tanggal'] = $tanggal;
+    //     $data['bulan'] = $bulan;
+    //     $data['tahun'] = $tahun;
+
+
+    //     $where = [
+    //         'tbl_afkrekap.jeniswaktu' => 'bulanan',
+    //         'tbl_afkrekap.waktu' => $waktu,
+    //         'tbl_afkcat.io' => 'o'
+    //     ];
+    //     $column = 'tbl_afkrekap.jenis as jenis,
+    //     tbl_afkrekap.nilai as nilai,
+    //     tbl_afkcat.deskripsi as deskripsi,
+    //     tbl_afkcat.cat as cat';
+    //     $order_by = 'CONVERT(nilai, SIGNED) ASC';
+    //     $data['get'] = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
+    //     // RT Tahun
+    //     // $waktutahun = date('Y-01-01');
+    //     $wheretahun = [
+    //         'tbl_afkrekap.jeniswaktu' => 'tahunan',
+    //         'tbl_afkrekap.waktu' => $waktutahun,
+    //         'tbl_afkcat.io' => 'o'
+    //     ];
+    //     $data['gettahun'] = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $wheretahun, $order_by)->result_array();
+    //     //RT 4EVER
+    //     $wher4ever = [
+    //         'tbl_afkrekap.jeniswaktu' => '4ever',
+    //         'tbl_afkcat.io' => 'o'
+    //     ];
+    //     $data['get4ever'] = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $wher4ever, $order_by)->result_array();
+
+    //     //============================================================================
+    //     // RT Harian
+    //     //OUT
+    //     $where = [
+    //         'tbl_afkrekap.jeniswaktu' => 'harian',
+    //         'tbl_afkrekap.waktu'      => $waktuhari,
+    //         'tbl_afkcat.io'           => 'o'
+    //     ];
+
+    //     $column = '
+    //         tbl_afkrekap.jenis as jenis,
+    //         tbl_afkrekap.nilai as nilai,
+    //         tbl_afkcat.deskripsi as deskripsi,
+    //         tbl_afkcat.cat as cat
+    //     ';
+
+    //     $order_by = 'CONVERT(nilai, SIGNED) ASC';
+
+    //     $data['gethari'] = $this->sql
+    //         ->select_table_join(
+    //             'tbl_afkrekap',
+    //             $column,
+    //             'tbl_afkcat',
+    //             'tbl_afkcat.id = tbl_afkrekap.jenis',
+    //             'LEFT',
+    //             $where,
+    //             $order_by
+    //         )
+    //         ->result_array();
+
+    //     $a = 0;
+    //     foreach ($data['gethari'] as $row) {
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a += (float) $row['nilai'];
+    //         }
+    //     }
+    //     $data['OUThari'] = $a;
+
+    //     //IN
+    //     $where = [
+    //         'tbl_afkrekap.jeniswaktu' => 'harian',
+    //         'tbl_afkrekap.waktu'      => $waktuhari,
+    //         'tbl_afkcat.io'           => 'i'
+    //     ];
+
+    //     $column = '
+    //         tbl_afkrekap.nilai as nilai,
+    //         tbl_afkcat.deskripsi as deskripsi,
+    //         tbl_afkcat.cat as cat
+    //     ';
+
+    //     $order_by = 'CONVERT(nilai, SIGNED) ASC';
+
+    //     $query = $this->sql
+    //         ->select_table_join(
+    //             'tbl_afkrekap',
+    //             $column,
+    //             'tbl_afkcat',
+    //             'tbl_afkcat.id = tbl_afkrekap.jenis',
+    //             'LEFT',
+    //             $where,
+    //             $order_by
+    //         )
+    //         ->result_array();
+
+    //     $a = 0;
+    //     foreach ($query as $row) {
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a += (float) $row['nilai'];
+    //         }
+    //     }
+    //     $data['INhari'] = $a;
+
+
+    //     $data['SALDOhari'] = $data['INhari'] + $data['OUThari'];
+
+    //     //============================================================================
+    //     // Tab Bulan
+    //     //OUT
+    //     $a = 0;
+    //     foreach ($data['get'] as $row) :
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
+    //         }
+    //     endforeach;
+    //     $data['OUTbulan'] = $a;
+    //     //IN
+    //     $where = [
+    //         'tbl_afkrekap.jeniswaktu' => 'bulanan',
+    //         'tbl_afkrekap.waktu' => $waktu,
+    //         'tbl_afkcat.io' => 'i'
+    //     ];
+    //     $column = 'tbl_afkrekap.nilai as nilai,
+    //     tbl_afkcat.deskripsi as deskripsi,
+    //     tbl_afkcat.cat as cat';
+    //     $order_by = 'CONVERT(nilai, SIGNED) ASC';
+    //     $query = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
+
+    //     $a = 0;
+    //     foreach ($query as $row) :
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
+    //         }
+    //     endforeach;
+    //     $data['INbulan'] = $a;
+
+    //     $data['SALDObulan'] = $data['INbulan'] + $data['OUTbulan'];
+
+    //     // Tab Tahun
+    //     //OUT
+    //     $a = 0;
+    //     foreach ($data['gettahun'] as $row) :
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
+    //         }
+    //     endforeach;
+    //     $data['OUTtahun'] = $a;
+    //     //IN
+    //     $where = [
+    //         'tbl_afkrekap.jeniswaktu' => 'tahunan',
+    //         'tbl_afkrekap.waktu' => $waktutahun,
+    //         'tbl_afkcat.io' => 'i'
+    //     ];
+    //     $column = 'tbl_afkrekap.nilai as nilai,
+    //     tbl_afkcat.deskripsi as deskripsi,
+    //     tbl_afkcat.cat as cat';
+    //     $order_by = 'CONVERT(nilai, SIGNED) ASC';
+    //     $query = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
+
+    //     $a = 0;
+    //     foreach ($query as $row) :
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
+    //         }
+    //     endforeach;
+    //     $data['INtahun'] = $a;
+
+    //     $data['SALDOtahun'] = $data['INtahun'] + $data['OUTtahun'];
+
+    //     //TAB 4EVER
+    //     //OUT
+    //     $a1 = 0;
+    //     foreach ($data['get4ever'] as $row) :
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a1 += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
+    //         }
+    //     endforeach;
+    //     $data['OUT4ever'] = $a1;
+    //     //IN
+    //     $where = [
+    //         'tbl_afkrekap.jeniswaktu' => 'tahunan',
+    //         'tbl_afkcat.io' => 'i'
+    //     ];
+    //     $column = 'tbl_afkrekap.nilai as nilai,
+    //         tbl_afkcat.deskripsi as deskripsi,
+    //         tbl_afkcat.cat as cat';
+    //     $order_by = 'CONVERT(nilai, SIGNED) ASC';
+    //     $query = $this->sql->select_table_join('tbl_afkrekap', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkrekap.jenis', 'LEFT', $where, $order_by)->result_array();
+
+    //     $a2 = 0;
+    //     foreach ($query as $row) :
+    //         if (isset($row['nilai']) && is_numeric($row['nilai'])) {
+    //             $a2 += (float)$row['nilai']; // Konversi ke angka sebelum dijumlahkan
+    //         }
+    //     endforeach;
+    //     $data['IN4ever'] = $a2;
+
+    //     $data['SALDO4ever'] = $data['IN4ever'] + $data['OUT4ever'];
+
+    //     $data['judul'] = "Wawasan";
+    //     $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();
+    //     $data['getsubmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'submenu'], 'urutan ASC')->result_array();
+    //     $data['subview'] = "afk/insight";
+    //     $this->load->view('partial', $data);
+    // }
 
     public function insightview()
     {
         $data['tahun'] = $this->input->post('tahun');
         $data['bulan'] = $this->input->post('bulan');
+        $data['tanggal'] = $this->input->post('tanggal');
         $data['jeniswaktu'] = $this->input->post('jeniswaktu');
         $data['jenis'] = $this->input->post('jenis');
 
@@ -654,6 +942,8 @@ class Afk extends CI_Controller
         } else if ($data['jeniswaktu'] == 'tahunan') {
             $where += ['YEAR(tbl_afkmain.tanggal)' => $this->input->post('tahun')];
         } else if ($data['jeniswaktu'] == '4ever') {
+        } else if ($data['jeniswaktu'] == 'harian') {
+            $where += ['tbl_afkmain.tanggal' => $this->input->post('tahun') . '-' . $this->input->post('bulan') . '-' . $this->input->post('tanggal')];
         }
 
         $data['get'] = $this->sql->select_table_join('tbl_afkmain', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkmain.catid', 'LEFT', $where)->result_array();

@@ -27,7 +27,7 @@
                 <tbody>
                     <?php foreach ($get as $row): ?>
                         <!-- class="text-decoration-line-through" -->
-                        <tr class="<?= $row['status'] == "2" ? 'fw-lighter' : ''; ?>">
+                        <tr class="<?= $row['status'] == "2" ? 'fw-lighter text-decoration-line-through' : ''; ?>">
                             <td><?= $row['id'] ?></td>
                             <td><?= $row['nama'] ?></td>
                             <td><?= $row['deskripsi'] ?></td>
@@ -170,8 +170,9 @@
             ],
             pageLength: -1,
             order: [
-                [7, 'asc'],
-                [4, 'asc']
+                [5, 'asc'],
+                [3, 'desc'],
+                [0, 'desc']
             ]
         });
     });

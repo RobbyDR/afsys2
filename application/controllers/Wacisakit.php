@@ -11,14 +11,11 @@ class Wacisakit extends CI_Controller
     // ============================== MENU UTAMA
     public function index()
     {
-        $data['judul'] = "WACI Sakit";
+        $data['judul'] = "BBLM Todo List";
         $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();
         $data['getsubmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'submenu'], 'urutan ASC')->result_array();
 
         $data['get'] = $this->sql->select_table('tbl_wacisakit', null, 'id DESC')->result_array();
-        // function select_table_join($table, $column, $join_table, $join_on, $join, $where = array(1 => 1), $order_by = null)
-        // $data['get'] = $this->sql->select_table_join('tbl_wacisakit', 'tbl_wacisakit.*,tbl_s2matkul.nama as namamatkul', 'tbl_s2matkul', 'tbl_s2matkul.id=tbl_wacisakit.matkulid', 'left', array(1 => 1), 'tbl_wacisakit.status ASC, tbl_wacisakit.deadline ASC')->result_array();
-        // $data['getmatkulid'] = $this->sql->select_table('tbl_s2matkul', ['tbl_s2matkul.status' => '1'], 'id ASC')->result_array();
 
         $data['subview'] = "wacisakit/index";
         $this->load->view('partial', $data);
@@ -59,7 +56,6 @@ class Wacisakit extends CI_Controller
     {
         if ($this->input->post()) {
             $data['get'] = $this->sql->select_table('tbl_wacisakit', ['id' => $this->input->post('id')])->row_array();
-            // $data['getmatkulid'] = $this->sql->select_table('tbl_s2matkul', ['tbl_s2matkul.status' => '1'], 'id ASC')->result_array();
             $this->load->view('wacisakit/getedit', $data);
         } else {
             echo "elor";

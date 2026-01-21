@@ -9,14 +9,17 @@
                 <!-- <button type="button" class="btn btn-primary btn-sm disabled">Laporan Bulanan</button> -->
 
                 <div class="btn-group" role="group" aria-label="Basic example">
-                    <button type="button" class="btn btn-sm btn-secondary" title="Tambah" data-bs-toggle="modal" data-bs-target="#tambahafkjurnalModal">Tambah</button>
+                    <button type="button" class="btn btn-sm btn-primary" title="Tambah" data-bs-toggle="modal" data-bs-target="#tambahafkjurnalModal">Tambah</button>
                     <!-- <button type="button" id="jurnalkeuangan" class="btn btn-sm btn-primary" title="Jurnal Keuangan">Jurnal Keuangan</button> -->
-                    <div class="btn-group" role="group">
-                        <button id="btnGroupDrop1" type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                            <!-- <i data-feather="refresh-ccw"></i> -->
+                    <!-- <button id="btnGroupDrop1" type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                             <span data-feather="refresh-ccw" class="align-text-bottom"></span>
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="btnGroupDrop1">
+                        </button> -->
+                    <!-- <ul class="dropdown-menu" aria-labelledby="btnGroupDrop1">
+                            <li>
+                                <button type="button" class="dropdown-item" id="updaterekap">
+                                    Update Rekap
+                                </button>
+                            </li>
                             <li>
                                 <button type="button" class="dropdown-item" id="updatesaldo">
                                     Update Saldo Keseluruhan
@@ -27,8 +30,26 @@
                                     Update Saldo Bulanan
                                 </button>
                             </li>
-                        </ul>
-                    </div>
+                        </ul> -->
+                    <a href="#" id="dashboard"
+                        rel="noopener noreferrer"
+                        class="btn btn-sm btn-outline-warning"
+                        title="goto dashboard">
+                        Dashboard
+                    </a>
+                    <a href="#" id="insight"
+                        rel="noopener noreferrer"
+                        class="btn btn-sm btn-outline-warning"
+                        title="goto insight">
+                        Insight
+                    </a>
+                    <a href="#" id="updatesaldo"
+                        rel="noopener noreferrer"
+                        class="btn btn-sm btn-outline-warning"
+                        title="refresh">
+                        <span data-feather="refresh-cw"></span>
+                    </a>
+
 
                     <select class="form-select form-select-sm me-1" id="bulanselect">
                         <?php for ($i = 1; $i <= 12; $i++): ?>
@@ -268,6 +289,18 @@
             width: '100%',
             placeholder: 'Pilih kategori...',
             allowClear: true
+        });
+    });
+</script>
+
+<script>
+    $(document).ready(function() {
+        $("#updaterekap").click(() => window.location.href = '<?= base_url('afk/afkupdaterekap') ?>');
+        $("#insight").on("click", function() {
+            window.location.href = '<?= base_url('afk/insight') ?>';
+        });
+        $("#dashboard").on("click", function() {
+            window.location.href = '<?= base_url('afk') ?>';
         });
     });
 </script>

@@ -2,7 +2,22 @@
     <div class="modal-header border-secondary">
         <h5 class="modal-title" id="viewModalLabel">
             <span data-feather="list" class="align-text-bottom"></span>
-            Detail <?= $get[0]["tbl_afkcatdeskripsi"] ?? '' ?> <?= $bulan ?>/<?= $tahun ?>
+            <?php
+            $judulWaktu = '';
+
+            if ($jeniswaktu === 'tahunan') {
+                $judulWaktu = $tahun;
+            } elseif ($jeniswaktu === 'bulanan') {
+                $judulWaktu = $bulan . '/' . $tahun;
+            } elseif ($jeniswaktu === 'harian') {
+                $judulWaktu = $tanggal . '/' . $bulan . '/' . $tahun;
+            } elseif ($jeniswaktu === '4ever') {
+                $judulWaktu = '4ever';
+            }
+            ?>
+
+            Detail <?= $get[0]['tbl_afkcatdeskripsi'] ?? '' ?> <?= $judulWaktu ?>
+
         </h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
