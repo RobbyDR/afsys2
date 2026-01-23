@@ -80,19 +80,19 @@
                         datasets: [{
                                 label: 'Pemasukan',
                                 data: d.in,
-                                borderWidth: 3,
+                                borderWidth: 1,
                                 pointRadius: 0
                             },
                             {
                                 label: 'Pengeluaran',
                                 data: d.out,
-                                borderWidth: 3,
+                                borderWidth: 1,
                                 pointRadius: 0
                             },
                             {
                                 label: 'Saldo',
                                 data: d.saldo,
-                                borderWidth: 4,
+                                borderWidth: 2,
                                 borderDash: [6, 4],
                                 pointRadius: 0
                             }
@@ -117,7 +117,7 @@
                         datasets: [{
                             label: 'Akumulasi Saldo (Dompet)',
                             data: d.akumulasi,
-                            borderWidth: 4,
+                            borderWidth: 1,
                             pointRadius: 0
                         }]
                     },
@@ -171,7 +171,7 @@
                             datasets: [{
                                 label: 'Posisi Dompet',
                                 data: d.akumulasi,
-                                borderWidth: 4,
+                                borderWidth: 1,
                                 pointRadius: 0,
                                 fill: false
                             }]

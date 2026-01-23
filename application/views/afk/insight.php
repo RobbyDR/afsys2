@@ -99,7 +99,7 @@ $tanggal = (int)$baseDate->format('d');
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-1">
         <!-- ====== Kartu Bulanan / Tahunan / 4EVER ====== -->
         <?php
         $summary = [
@@ -112,6 +112,7 @@ $tanggal = (int)$baseDate->format('d');
             <div class="col-md">
                 <div class="card bg-dark border-secondary h-100">
                     <div class="card-body">
+
                         <h5 class="card-title text-light"><?= $item['label'] ?></h5>
                         <table class="table table-dark table-striped table-hover table-sm align-middle mb-0">
                             <thead class="table-secondary text-dark">
@@ -177,7 +178,7 @@ $tanggal = (int)$baseDate->format('d');
     </div>
 
     <!-- ====== Top Pengeluaran ====== -->
-    <div class="row g-3 mt-3">
+    <div class="row g-1 mt-3">
         <?php
         $topdata = [
             ["title" => "Top Pengeluaran RT Tanggal $tanggal", "data" => $gethari, "total" => $OUThari, "jeniswaktu" => "harian"],
@@ -190,10 +191,22 @@ $tanggal = (int)$baseDate->format('d');
                 <div class="card bg-dark border-secondary h-100">
                     <div class="card-body">
                         <h5 class="card-title text-light">
-                            <?= $tbl['title'] ?>
-                            <?php if ($tbl['jeniswaktu'] === '4ever'): ?>
-                                <span class="badge bg-secondary">Since 20231209</span>
-                            <?php endif; ?>
+                            <!-- <a href="#!" class="text-reset text-decoration-none" data-bs-toggle="modal" data-bs-target="#donatModal">
+                                <?= $tbl['title'] ?>
+                                <?php if ($tbl['jeniswaktu'] === '4ever'): ?>
+                                    <span class="badge bg-secondary">Since 20231209</span>
+                                <?php endif; ?>
+                            </a> -->
+                            <a href="#!" class="text-reset text-decoration-none"
+                                data-bs-toggle="modal"
+                                data-bs-target="#donatModal"
+                                data-jeniswaktu="<?= $tbl['jeniswaktu'] ?>">
+                                <?= $tbl['title'] ?>
+                                <?php if ($tbl['jeniswaktu'] === '4ever'): ?>
+                                    <span class="badge bg-secondary">Since 20231209</span>
+                                <?php endif; ?>
+                            </a>
+
                         </h5>
                         <table class="table table-dark table-striped table-hover table-sm align-middle mb-0">
                             <thead class="table-secondary text-dark">
@@ -274,6 +287,22 @@ $tanggal = (int)$baseDate->format('d');
     </div>
 </div>
 
+<div class="modal fade" id="donatModal" tabindex="-1" aria-labelledby="donatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="donatModalLabel">
+                    <span data-feather="list" class="align-text-bottom"></span> Donat
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="isidonatModal">
+                <div class="text-center text-secondary">Memuat data...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ====== Script Modal ====== -->
 <script>
     $(document).ready(function() {
@@ -308,6 +337,39 @@ $tanggal = (int)$baseDate->format('d');
                 feather.replace();
             }).fail(function() {
                 $("#isiViewModal").html('<div class="alert alert-danger">Gagal memuat data.</div>');
+            });
+        });
+
+        $('#donatModal').on('shown.bs.modal', function(e) {
+            let btn = $(e.relatedTarget);
+            let jenis = btn.data('jenis');
+            let tahun = btn.data('tahun');
+            let bulan = btn.data('bulan');
+            let tanggal = btn.data('tanggal');
+            let jeniswaktu = btn.data('jeniswaktu');
+            // console.log(tanggal);
+            // console.log(bulan);
+            // console.log(tahun);
+            let csfrData = {};
+            csfrData['<?= $this->security->get_csrf_token_name(); ?>'] = '<?= $this->security->get_csrf_hash(); ?>';
+            $.ajaxSetup({
+                data: csfrData
+            });
+
+            $("#isidonatModal").html('<div class="text-center text-secondary py-3"><span data-feather="loader" class="spin"></span> Memuat...</div>');
+            feather.replace();
+
+            $.post("<?= base_url('afk/donat') ?>", {
+                jenis: jenis,
+                tahun: tahun,
+                bulan: bulan,
+                tanggal: tanggal,
+                jeniswaktu: jeniswaktu
+            }).done(function(response) {
+                $("#isidonatModal").html(response);
+                feather.replace();
+            }).fail(function() {
+                $("#isidonatModal").html('<div class="alert alert-danger">Gagal memuat data.</div>');
             });
         });
     });

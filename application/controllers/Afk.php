@@ -688,6 +688,18 @@ class Afk extends CI_Controller
             'urutan ASC'
         )->result_array();
 
+        // SIMPAN DATA INSIGHT KE SESSION (TEMPORARY)
+        $this->session->set_userdata('afk_insight_cache', [
+            'tanggal'   => $data['tanggal'],
+            'bulan'     => $data['bulan'],
+            'tahun'     => $data['tahun'],
+            'gethari'   => $data['gethari'],
+            'get'       => $data['get'],
+            'gettahun'  => $data['gettahun'],
+            'get4ever'  => $data['get4ever'],
+        ]);
+
+
         $data['subview'] = 'afk/insight';
         $this->load->view('partial', $data);
     }
@@ -1298,5 +1310,42 @@ class Afk extends CI_Controller
                 'labels'    => $labels,
                 'akumulasi' => $data
             ]));
+    }
+
+    public function donat()
+    {
+        $jeniswaktu = $this->input->post('jeniswaktu');
+
+        $cache = $this->session->userdata('afk_insight_cache');
+
+        if (!$cache) {
+            show_error('Data insight belum tersedia');
+        }
+
+        switch ($jeniswaktu) {
+            case 'harian':
+                $rows  = $cache['gethari'];
+                $judul = "Donat Pengeluaran Harian";
+                break;
+
+            case 'bulanan':
+                $rows  = $cache['get'];
+                $judul = "Donat Pengeluaran Bulanan";
+                break;
+
+            case 'tahunan':
+                $rows  = $cache['gettahun'];
+                $judul = "Donat Pengeluaran Tahunan";
+                break;
+
+            default: // 4ever
+                $rows  = $cache['get4ever'];
+                $judul = "Donat Pengeluaran 4EVER";
+        }
+
+        $this->load->view('afk/donat', [
+            'rows'  => $rows,
+            'judul' => $judul
+        ]);
     }
 }

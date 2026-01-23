@@ -14,6 +14,25 @@
          }
      }, 5000); // Adjust the time as needed
  </script>
+
+ <script>
+     document.addEventListener('DOMContentLoaded', function() {
+         const btn = document.getElementById('toggleSidebar');
+
+         if (!btn) return;
+
+         // restore state
+         if (localStorage.getItem('sidebar') === 'collapsed') {
+             document.body.classList.add('sidebar-collapsed');
+         }
+
+         btn.addEventListener('click', function() {
+             const collapsed = document.body.classList.toggle('sidebar-collapsed');
+             localStorage.setItem('sidebar', collapsed ? 'collapsed' : 'open');
+         });
+     });
+ </script>
+
  </body>
 
  </html>

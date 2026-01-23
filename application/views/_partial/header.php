@@ -152,7 +152,23 @@
         }
     </style>
 
+    <style>
+        /* ============================= */
+        /* SIDEBAR GLOBAL COLLAPSE */
+        /* ============================= */
+        body.sidebar-collapsed #sidebar {
+            display: none !important;
+        }
 
+        body.sidebar-collapsed main {
+            width: 100% !important;
+        }
+
+        /* Smooth feel */
+        #sidebar {
+            transition: all 0.25s ease-in-out;
+        }
+    </style>
     <!-- Custom styles for this template -->
     <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.min.css" rel="stylesheet"> -->
     <!-- Custom styles for this template -->
@@ -242,12 +258,20 @@
     </div>
 
     <main class="d-flex flex-nowrap">
+        <button id="toggleSidebar" class="btn btn-sm btn-outline-secondary position-fixed top-0 start-0 m-3" style="z-index: 2000;">
+            <i data-feather="menu"></i>
+        </button>
 
-        <div class="flex-shrink-0 p-3 d-flex flex-column align-items-stretch" style="width: 280px;">
+        <div id="sidebar" class="sidebar flex-shrink-0 p-3 d-flex flex-column align-items-stretch" style="width: 280px;">
             <a href="<?= base_url('/beranda') ?>" class="d-flex align-items-center pb-3 mb-3 link-body-emphasis text-decoration-none border-bottom">
                 <i data-feather="youtube" width="48"></i>
                 <span class=" fs-5 fw-semibold">Alfatih Family</span>
             </a>
+            <!-- <div class="d-flex justify-content-end mb-2">
+                <button id="toggleSidebar" class="btn btn-sm btn-outline-secondary">
+                    <i data-feather="menu"></i>
+                </button>
+            </div> -->
             <ul class="list-unstyled ps-0 list-group list-group-flush border-bottom scrollarea">
                 <?php foreach ($getmenu as $row) : ?>
                     <li class="mb-1">

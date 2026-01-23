@@ -35,7 +35,7 @@
                                 <td class="text-wrap"><?= number_format($row['bnik'], 0, ',', '.'); ?></td>
                                 <td class="text-wrap"><?= number_format($total, 0, ',', '.'); ?></td>
                                 <td>
-                                    <button type="button" data-toggle="modal" data-id="<?= $row['id'] ?>" data-target="#editafkModal" class="btn btn-sm btn-secondary mr-1" title="edit data"><span data-feather="edit" class="align-text-bottom"></span></button>
+                                    <button type="button" data-bs-toggle="modal" data-id="<?= $row['id'] ?>" data-bs-target="#editafkModal" class="btn btn-sm btn-secondary mr-1" title="edit data"><span data-feather="edit" class="align-text-bottom"></span></button>
                                 </td>
                             </tr>
 
@@ -58,7 +58,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="editafkModalLabel">Edit Data</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
