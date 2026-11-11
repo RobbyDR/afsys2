@@ -20,8 +20,16 @@ class Afk_mod extends CI_model
         $this->db->where('YEAR(tanggal)', $tahunselect);
         $this->db->where('MONTH(tanggal)', $bulanselect);
 
-        if ($sort == 'ascid') $this->db->order_by('id', 'asc');
-        else $this->db->order_by('id', 'desc');
+        // Urut menurut TANGGAL (bukan urutan input), lalu id untuk tanggal yang sama,
+        // supaya transaksi sisipan bertanggal lampau tampil di posisi kronologisnya
+        // dan kolom saldo terbaca runtut.
+        if ($sort == 'ascid') {
+            $this->db->order_by('tanggal', 'asc');
+            $this->db->order_by('id', 'asc');
+        } else {
+            $this->db->order_by('tanggal', 'desc');
+            $this->db->order_by('id', 'desc');
+        }
 
         $this->db->from('tbl_afkmain');
         return $this->db->get();
