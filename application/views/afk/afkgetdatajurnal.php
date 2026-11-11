@@ -13,9 +13,9 @@
                         <th>Tanggal</th>
                         <th>Kategori</th>
                         <th>Deskripsi</th>
-                        <th>Saku</th>
-                        <th>BNI</th>
-                        <th>BNIk</th>
+                        <?php foreach ($akun as $a): ?>
+                            <th><?= html_escape($a['nama']) ?></th>
+                        <?php endforeach; ?>
                         <th>Saldo</th>
                         <th>Aksi</th>
                     </tr>
@@ -27,9 +27,9 @@
                             <td><?= $row['tanggal'] ?></td>
                             <td><?= $row['tbl_afkcatdeskripsi']; ?> <?= $row['tbl_afkcatio'] ?><?= $row['tbl_afkcatcat'] ?></td>
                             <td><?= $row['deskripsi']; ?></td>
-                            <td class="text-end"><?= number_format($row['saku'], 0, ',', '.'); ?></td>
-                            <td class="text-end"><?= number_format($row['bni'], 0, ',', '.'); ?></td>
-                            <td class="text-end"><?= number_format($row['bnik'], 0, ',', '.'); ?></td>
+                            <?php foreach ($akun as $a): ?>
+                                <td class="text-end"><?= number_format($row['nilai'][$a['id']] ?? 0, 0, ',', '.'); ?></td>
+                            <?php endforeach; ?>
                             <td class="text-end fw-semibold text-primary"><?= number_format($row['saldo'], 0, ',', '.'); ?></td>
                             <td class="text-center">
                                 <button type="button"

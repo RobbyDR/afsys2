@@ -11,6 +11,7 @@
                 <div class="btn-group" role="group" aria-label="Basic example">
                     <button type="button" id="insight" class="btn btn-sm btn-warning" title="Insight">Insight</button>
                     <button type="button" id="jurnalkeuangan" class="btn btn-sm btn-primary" title="Jurnal Keuangan">Jurnal Keuangan</button>
+                    <button type="button" id="potret" class="btn btn-sm btn-info" title="Posisi keuangan pada tanggal tertentu">Potret</button>
                     <div class="btn-group" role="group">
                         <a href="#" id="grafik"
                             rel="noopener noreferrer"
@@ -24,8 +25,7 @@
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="btnGroupDrop1">
                             <li><a class="dropdown-item" href="#" id="updaterekap">Update Rekap Keseluruhan</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="updaterekap2">Update Rekap Bulanan</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="updaterekap3">Update Rekap Lampau</a></li>
+                            <li><a class="dropdown-item" href="<?= base_url('afk/akun') ?>">Kelola Akun</a></li>
                         </ul>
                     </div>
                 </div>
@@ -46,6 +46,53 @@
                         </figcaption>
                     </figure>
                     </p>
+                    <hr>
+                    <p class="card-text mb-0">
+                        <strong>Pengeluaran Hari Ini:</strong>
+                        Rp <?= number_format($pengeluaranHariIni, 0, ',', '.') ?>
+                        <?php if ($persenPengeluaranHariIni !== null): ?>
+                            <span class="badge <?= ($persenPengeluaranHariIni > 100) ? 'bg-danger' : 'bg-secondary' ?>">
+                                <?= number_format($persenPengeluaranHariIni, 1, ',', '.') ?>% dari pemasukan hari ini
+                            </span>
+                        <?php else: ?>
+                            <span class="badge bg-secondary">belum ada pemasukan hari ini</span>
+                        <?php endif; ?>
+                    </p>
+                    <hr>
+                    <?php
+                    // warna baterai: hijau = di atas/pas jalur, kuning = sedikit di bawah (<= 10 poin), merah = jauh di bawah
+                    $warnaBaterai = 'bg-secondary';
+                    if ($persenSisaBulanIni !== null) {
+                        $selisihPoin = $persenSisaBulanIni - $persenProporsional;
+                        $warnaBaterai = ($selisihPoin >= 0) ? 'bg-success' : (($selisihPoin >= -10) ? 'bg-warning' : 'bg-danger');
+                    }
+                    $lebarBaterai = ($persenSisaBulanIni !== null) ? max(0, min(100, $persenSisaBulanIni)) : 0;
+                    ?>
+                    <p class="card-text mb-1">
+                        <strong>Baterai bulan ini:</strong>
+                        <?php if ($persenSisaBulanIni !== null): ?>
+                            <?= number_format($persenSisaBulanIni, 1, ',', '.') ?>%
+                            <small class="text-muted">(Rp <?= number_format($sisaBulanIni, 0, ',', '.') ?> dari pemasukan Rp <?= number_format($pemasukanBulanIni, 0, ',', '.') ?>)</small>
+                        <?php else: ?>
+                            <span class="badge bg-secondary">belum ada pemasukan bulan ini</span>
+                        <?php endif; ?>
+                    </p>
+                    <div class="progress position-relative" style="height: 18px;" title="Garis hitam = sisa ideal hari ini menurut kalender">
+                        <div class="progress-bar <?= $warnaBaterai ?>" role="progressbar" style="width: <?= number_format($lebarBaterai, 2, '.', '') ?>%;"></div>
+                        <div class="position-absolute top-0 bottom-0" style="left: <?= number_format(max(0, min(100, $persenProporsional)), 2, '.', '') ?>%; width: 2px; background: #000;"></div>
+                    </div>
+                    <p class="card-text small text-muted mt-1 mb-0">
+                        Proporsional (tgl <?= (int) $tglHariIni ?> dari <?= (int) $hariDalamBulan ?>): <strong><?= number_format($persenProporsional, 1, ',', '.') ?>%</strong>
+                        <?php if ($targetSisaHariIni !== null): ?>
+                            &middot; sisa seharusnya <strong>Rp <?= number_format($targetSisaHariIni, 0, ',', '.') ?></strong>
+                            &middot;
+                            <?php if ($selisihTarget >= 0): ?>
+                                <span class="text-success">di atas jalur Rp <?= number_format($selisihTarget, 0, ',', '.') ?></span>
+                            <?php else: ?>
+                                <span class="text-danger">di bawah jalur Rp <?= number_format(abs($selisihTarget), 0, ',', '.') ?> (rem dulu)</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </p>
                 </div>
             </div>
 
@@ -53,16 +100,21 @@
                 <div class="card-body">
                     <h5 class="card-title">Saldo Uang Hari Ini</h5>
                     <dl class="row">
-                        <dt class="col-sm-4">BNI</dt>
-                        <dd class="col-sm-8"><?= number_format(floatval($saldoskrbni), 0, ',', '.') ?> | <?= $bnistate ?><?= number_format(floatval($deltabni), 0, ',', '.') ?></dd>
-                        <dt class="col-sm-4">BNIk</dt>
-                        <dd class="col-sm-8"><?= number_format(floatval($saldoskrbnik), 0, ',', '.') ?> | <?= $bnikstate ?><?= number_format(floatval($deltabnik), 0, ',', '.') ?></dd>
-                        <dt class="col-sm-4"><strong>TOTAL BNI</strong></dt>
-                        <dd class="col-sm-8"><strong><?= number_format(floatval($saldoskrbnik + $saldoskrbni), 0, ',', '.') ?> | <?= $bnibnikstate ?><?= number_format(floatval($deltabnibnik), 0, ',', '.') ?></strong></dd>
-                        <dt class="col-sm-4">Saku</dt>
-                        <dd class="col-sm-8"><?= number_format(floatval($saldoskrsaku), 0, ',', '.') ?> | <?= $sakustate ?><?= number_format(floatval($deltasaku), 0, ',', '.') ?></dd>
+                        <?php foreach ($akunsaldo as $i => $a): ?>
+                            <dt class="col-sm-4"><?= html_escape($a['nama']) ?></dt>
+                            <dd class="col-sm-8"><?= number_format(floatval($a['saldo']), 0, ',', '.') ?> | <?= $a['state'] ?><?= number_format(floatval($a['delta']), 0, ',', '.') ?></dd>
+                            <?php
+                            // subtotal grup muncul setelah akun terakhir dalam grup yang sama
+                            $grupBerikut = $akunsaldo[$i + 1]['grup'] ?? null;
+                            if ($a['grup'] !== '' && $grupBerikut !== $a['grup']):
+                                $g = $grupTotal[$a['grup']];
+                            ?>
+                                <dt class="col-sm-4"><strong>TOTAL <?= html_escape(strtoupper($a['grup'])) ?></strong></dt>
+                                <dd class="col-sm-8"><strong><?= number_format(floatval($g['saldo']), 0, ',', '.') ?> | <?= $g['state'] ?><?= number_format(floatval($g['delta']), 0, ',', '.') ?></strong></dd>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
                         <dt class="col-sm-4"><strong>SUPER TOTAL</strong></dt>
-                        <dd class="col-sm-8"><strong><?= number_format(floatval($saldoskrbni + $saldoskrbnik + $saldoskrsaku), 0, ',', '.') ?> | <?= $bnibniksakustate ?><?= number_format(floatval($deltabnibniksaku), 0, ',', '.') ?></strong></dd>
+                        <dd class="col-sm-8"><strong><?= number_format(floatval($superSaldo), 0, ',', '.') ?> | <?= $superState ?><?= number_format(floatval($superDelta), 0, ',', '.') ?></strong></dd>
                     </dl>
                 </div>
             </div>
@@ -206,8 +258,7 @@
             window.location.href = '<?= base_url('afk/grafik') ?>';
         });
         $("#updaterekap").click(() => window.location.href = '<?= base_url('afk/afkupdaterekap') ?>');
-        $("#updaterekap2").click(() => window.location.href = '<?= base_url('afk/afkupdaterekapbulanan') ?>');
-        $("#updaterekap3").click(() => window.location.href = '<?= base_url('afk/afkupdaterekaplampau') ?>');
+        $("#potret").click(() => window.location.href = '<?= base_url('afk/potret') ?>');
 
         $("#pilihbulan, #pilihtahun").on("change", afkgetrekaptanggal);
         $("#pilihtahun2").on("change", afkgetrekapbulan);

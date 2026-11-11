@@ -33,9 +33,9 @@
                             <th scope="col">Kategori</th>
                         <?php endif; ?>
                         <th scope="col">Deskripsi</th>
-                        <th scope="col" class="text-end">Saku</th>
-                        <th scope="col" class="text-end">BNI</th>
-                        <th scope="col" class="text-end">BNIK</th>
+                        <?php foreach ($akun as $a): ?>
+                            <th scope="col" class="text-end"><?= html_escape($a['nama']) ?></th>
+                        <?php endforeach; ?>
                         <th scope="col" class="text-end">TOTAL</th>
                     </tr>
                 </thead>
@@ -43,7 +43,7 @@
                     <?php $sum = 0;
                     $i = 1; ?>
                     <?php foreach ($get as $row): ?>
-                        <?php $total = floatval($row['saku']) + floatval($row['bni']) + floatval($row['bnik']); ?>
+                        <?php $total = array_sum($row['nilai']); ?>
                         <?php $sum += $total; ?>
                         <tr>
                             <td><?= $i++ ?></td>
@@ -52,9 +52,9 @@
                                 <td><?= $row['tbl_afkcatdeskripsi'] ?></td>
                             <?php endif; ?>
                             <td><?= $row['deskripsi'] ?></td>
-                            <td class="text-end"><?= number_format(floatval($row['saku']), 0, ',', '.') ?></td>
-                            <td class="text-end"><?= number_format(floatval($row['bni']), 0, ',', '.') ?></td>
-                            <td class="text-end"><?= number_format(floatval($row['bnik']), 0, ',', '.') ?></td>
+                            <?php foreach ($akun as $a): ?>
+                                <td class="text-end"><?= number_format($row['nilai'][$a['id']] ?? 0, 0, ',', '.') ?></td>
+                            <?php endforeach; ?>
                             <td class="text-end text-info"><strong><?= number_format($total, 0, ',', '.') ?></strong></td>
                         </tr>
                     <?php endforeach; ?>

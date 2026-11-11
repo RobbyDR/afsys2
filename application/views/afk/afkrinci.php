@@ -14,9 +14,9 @@
                             <th>id</th>
                             <th>Tanggal</th>
                             <th>Deskripsi</th>
-                            <th>Saku</th>
-                            <th>BNI</th>
-                            <th>BNIk</th>
+                            <?php foreach ($akun as $a): ?>
+                                <th><?= html_escape($a['nama']) ?></th>
+                            <?php endforeach; ?>
                             <th>TOTAL</th>
                             <th></th>
                         </tr>
@@ -25,14 +25,14 @@
                         <?php
                         $total = 0;
                         foreach ($get as $row) : ?>
-                            <?php $total = $total + $row['saku'] + $row['bni'] + $row['bnik'] ?>
+                            <?php $total = $total + array_sum($row['nilai']) ?>
                             <tr>
                                 <td class="text-wrap"><?= $row['id'] ?></td>
                                 <td class="text-wrap"><?= $row['tanggal'] ?></td>
                                 <td class="text-wrap"><?= $row['deskripsi']; ?></td>
-                                <td class="text-wrap"><?= number_format($row['saku'], 0, ',', '.'); ?></td>
-                                <td class="text-wrap"><?= number_format($row['bni'], 0, ',', '.'); ?></td>
-                                <td class="text-wrap"><?= number_format($row['bnik'], 0, ',', '.'); ?></td>
+                                <?php foreach ($akun as $a): ?>
+                                    <td class="text-wrap"><?= number_format($row['nilai'][$a['id']] ?? 0, 0, ',', '.'); ?></td>
+                                <?php endforeach; ?>
                                 <td class="text-wrap"><?= number_format($total, 0, ',', '.'); ?></td>
                                 <td>
                                     <button type="button" data-bs-toggle="modal" data-id="<?= $row['id'] ?>" data-bs-target="#editafkModal" class="btn btn-sm btn-secondary mr-1" title="edit data"><span data-feather="edit" class="align-text-bottom"></span></button>
