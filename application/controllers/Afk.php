@@ -245,12 +245,34 @@ class Afk extends CI_Controller
 
         $data += $this->_susunSaldoAkun($akunSkr, $akunLalu);
 
-        // Indikator sisa uang bulan ini: (pemasukan - pengeluaran) / pemasukan.
-        // Pindah uang antar akun tidak ikut dihitung (bukan io 'i'/'o').
+        // Indikator "baterai" bulan ini. Pindah uang antar akun tidak ikut dihitung
+        // (bukan io 'i'/'o'). Bulan dianggap sebagai satu "pengisian": pemasukan = 100%.
         $ioBulanIni = $this->Afk_mod->afkgettotalioperiode(date('Y-m-01'), date('Y-m-t'));
-        $data['persenSisaBulanIni'] = ($ioBulanIni['in'] > 0)
-            ? (($ioBulanIni['in'] + $ioBulanIni['out']) / $ioBulanIni['in']) * 100
-            : null; // null = belum ada pemasukan bulan ini
+        $pemasukanBulan   = $ioBulanIni['in'];
+        $pengeluaranBulan = abs($ioBulanIni['out']);
+        $hariDalamBulan   = (int) date('t');
+        $tglHariIni       = (int) date('j');
+
+        // Proporsional menurut kalender: (hari dalam bulan - tanggal hari ini) / hari dalam bulan.
+        // Artinya sisa ideal pada akhir hari ini kalau uang dipakai merata sepanjang bulan.
+        $persenProporsional = (($hariDalamBulan - $tglHariIni) / $hariDalamBulan) * 100;
+
+        $data['hariDalamBulan']     = $hariDalamBulan;
+        $data['tglHariIni']         = $tglHariIni;
+        $data['persenProporsional'] = $persenProporsional;
+        $data['sisaBulanIni']       = $pemasukanBulan - $pengeluaranBulan;
+        $data['pemasukanBulanIni']  = $pemasukanBulan;
+        if ($pemasukanBulan > 0) {
+            $data['persenSisaBulanIni'] = ($data['sisaBulanIni'] / $pemasukanBulan) * 100;
+            // Sisa uang yang seharusnya masih ada hari ini, dan selisihnya dengan sisa sebenarnya
+            // (positif = masih di atas jalur / aman, negatif = lebih boros dari jalur -> rem).
+            $data['targetSisaHariIni'] = ($persenProporsional / 100) * $pemasukanBulan;
+            $data['selisihTarget']     = $data['sisaBulanIni'] - $data['targetSisaHariIni'];
+        } else {
+            $data['persenSisaBulanIni'] = null; // belum ada pemasukan bulan ini
+            $data['targetSisaHariIni']  = null;
+            $data['selisihTarget']      = null;
+        }
 
         $data['judul'] = "AF - Dashboard Keuangan";
         $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();

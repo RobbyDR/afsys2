@@ -58,6 +58,41 @@
                             <span class="badge bg-secondary">belum ada pemasukan hari ini</span>
                         <?php endif; ?>
                     </p>
+                    <hr>
+                    <?php
+                    // warna baterai: hijau = di atas/pas jalur, kuning = sedikit di bawah (<= 10 poin), merah = jauh di bawah
+                    $warnaBaterai = 'bg-secondary';
+                    if ($persenSisaBulanIni !== null) {
+                        $selisihPoin = $persenSisaBulanIni - $persenProporsional;
+                        $warnaBaterai = ($selisihPoin >= 0) ? 'bg-success' : (($selisihPoin >= -10) ? 'bg-warning' : 'bg-danger');
+                    }
+                    $lebarBaterai = ($persenSisaBulanIni !== null) ? max(0, min(100, $persenSisaBulanIni)) : 0;
+                    ?>
+                    <p class="card-text mb-1">
+                        <strong>Baterai bulan ini:</strong>
+                        <?php if ($persenSisaBulanIni !== null): ?>
+                            <?= number_format($persenSisaBulanIni, 1, ',', '.') ?>%
+                            <small class="text-muted">(Rp <?= number_format($sisaBulanIni, 0, ',', '.') ?> dari pemasukan Rp <?= number_format($pemasukanBulanIni, 0, ',', '.') ?>)</small>
+                        <?php else: ?>
+                            <span class="badge bg-secondary">belum ada pemasukan bulan ini</span>
+                        <?php endif; ?>
+                    </p>
+                    <div class="progress position-relative" style="height: 18px;" title="Garis hitam = sisa ideal hari ini menurut kalender">
+                        <div class="progress-bar <?= $warnaBaterai ?>" role="progressbar" style="width: <?= number_format($lebarBaterai, 2, '.', '') ?>%;"></div>
+                        <div class="position-absolute top-0 bottom-0" style="left: <?= number_format(max(0, min(100, $persenProporsional)), 2, '.', '') ?>%; width: 2px; background: #000;"></div>
+                    </div>
+                    <p class="card-text small text-muted mt-1 mb-0">
+                        Proporsional (tgl <?= (int) $tglHariIni ?> dari <?= (int) $hariDalamBulan ?>): <strong><?= number_format($persenProporsional, 1, ',', '.') ?>%</strong>
+                        <?php if ($targetSisaHariIni !== null): ?>
+                            &middot; sisa seharusnya <strong>Rp <?= number_format($targetSisaHariIni, 0, ',', '.') ?></strong>
+                            &middot;
+                            <?php if ($selisihTarget >= 0): ?>
+                                <span class="text-success">di atas jalur Rp <?= number_format($selisihTarget, 0, ',', '.') ?></span>
+                            <?php else: ?>
+                                <span class="text-danger">di bawah jalur Rp <?= number_format(abs($selisihTarget), 0, ',', '.') ?> (rem dulu)</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </p>
                 </div>
             </div>
 
@@ -79,7 +114,7 @@
                             <?php endif; ?>
                         <?php endforeach; ?>
                         <dt class="col-sm-4"><strong>SUPER TOTAL</strong></dt>
-                        <dd class="col-sm-8"><strong><?= number_format(floatval($superSaldo), 0, ',', '.') ?> <small title="Sisa uang bulan ini = (pemasukan - pengeluaran) / pemasukan"><?= ($persenSisaBulanIni !== null) ? '(' . number_format($persenSisaBulanIni, 1, ',', '.') . '%)' : '(-)' ?></small> | <?= $superState ?><?= number_format(floatval($superDelta), 0, ',', '.') ?></strong></dd>
+                        <dd class="col-sm-8"><strong><?= number_format(floatval($superSaldo), 0, ',', '.') ?> | <?= $superState ?><?= number_format(floatval($superDelta), 0, ',', '.') ?></strong></dd>
                     </dl>
                 </div>
             </div>
