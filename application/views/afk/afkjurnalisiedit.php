@@ -33,18 +33,12 @@
             </div>
         </div>
         <div class="row">
-            <div class="form-group col">
-                <label>saku<span class="text-danger">*</span></label>
-                <input type="number" step="any" inputmode="decimal" name="saku" class="form-control" title="isikan saku" value="<?= $get['saku'] ?>" id="saku2" required>
-            </div>
-            <div class="form-group col">
-                <label>bni<span class="text-danger">*</span></label>
-                <input type="number" step="any" inputmode="decimal" name="bni" class="form-control" title="isikan bni" value="<?= $get['bni'] ?>" id="bni2" required>
-            </div>
-            <div class="form-group col">
-                <label>bnik<span class="text-danger">*</span></label>
-                <input type="number" step="any" inputmode="decimal" name="bnik" class="form-control" title="isikan bnik" value="<?= $get['bnik'] ?>" id="bnik2" required>
-            </div>
+            <?php foreach ($akun as $a): ?>
+                <div class="form-group col">
+                    <label><?= html_escape($a['nama']) ?><span class="text-danger">*</span></label>
+                    <input type="number" step="any" inputmode="decimal" name="akun[<?= (int) $a['id'] ?>]" data-nama="<?= html_escape($a['nama']) ?>" class="form-control input-akun2" title="isikan <?= html_escape($a['nama']) ?>" value="<?= $get['nilai'][$a['id']] ?? 0 ?>" required>
+                </div>
+            <?php endforeach; ?>
             <div class="form-group col">
                 <label>saldo<span class="text-danger">**</span></label>
                 <input type="text" name="saldo" class="form-control" title="otomatis" value="<?= $get['saldo'] ?>" id='saldo2' readonly>
@@ -65,7 +59,7 @@
         // hasilnya NaN, dan nilai "NaN" itu ikut ter-submit & tersimpan ke
         // kolom tbl_afkmain.saldo.
         let saldoawal = await afkjurnalgetlastsaldo();
-        $("#saku2, #bni2, #bnik2").on("input", function() {
+        $(".input-akun2").on("input", function() {
             updateSaldo(saldoawal);
         });
 
@@ -77,19 +71,20 @@
         // Validasi tambahan sebelum submit form Edit: pastikan saku/bni/bnik
         // benar-benar angka (validasi utama tetap di server, ini lapisan UX)
         $("#editafkModal form").on("submit", function(e) {
-            const fields = ["#saku2", "#bni2", "#bnik2"];
-            for (const sel of fields) {
-                const val = $(sel).val();
+            let valid = true;
+            $(".input-akun2").each(function() {
+                const val = $(this).val();
                 if (val === "" || isNaN(val)) {
                     e.preventDefault();
-                    alert("Nilai " + sel.replace('#', '').replace('2', '').toUpperCase() + " harus berupa angka.");
-                    $(sel).focus();
-                    return false;
+                    alert("Nilai " + $(this).data('nama') + " harus berupa angka.");
+                    $(this).focus();
+                    valid = false;
+                    return false; // hentikan each
                 }
-            }
+            });
+            if (!valid) return false;
 
-            // Pagar tambahan: pastikan saldo hasil kalkulasi otomatis juga
-            // valid angka sebelum submit (jaga-jaga kalau ada bug serupa lagi).
+            // Pagar tambahan: pastikan saldo hasil kalkulasi otomatis juga valid angka
             const saldoVal = $("#saldo2").val();
             if (saldoVal === "" || isNaN(saldoVal)) {
                 e.preventDefault();
@@ -105,18 +100,19 @@
     // jadi tidak pernah jalan sama sekali, tanpa ada error yang kelihatan
     // di UI, cuma muncul di console browser).
     async function updateSaldo(saldoawal) {
-        let saku = parseFloat($("#saku2").val()) || 0;
-        let bni = parseFloat($("#bni2").val()) || 0;
-        let bnik = parseFloat($("#bnik2").val()) || 0;
+        let total = 0;
+        $(".input-akun2").each(function() {
+            total += parseFloat($(this).val()) || 0;
+        });
 
         let catid = $("#catid2").val();
         let io = await afkjurnalgetio(catid);
         // console.log(io);
         let saldo = 0;
         if (io == 'o') {
-            saldo = saldoawal - saku - bni - bnik;
+            saldo = saldoawal - total;
         } else if (io == 'i') {
-            saldo = saldoawal + saku + bni + bnik;
+            saldo = saldoawal + total;
         } else {
             saldo = saldoawal
         }

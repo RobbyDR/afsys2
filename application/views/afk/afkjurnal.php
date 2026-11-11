@@ -123,19 +123,13 @@
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col">
-                            <label class="form-label">Saku<span class="text-danger">*</span></label>
-                            <input type="number" step="any" inputmode="decimal" name="saku" id="saku" class="form-control" value="0" required>
-                        </div>
-                        <div class="col">
-                            <label class="form-label">BNI<span class="text-danger">*</span></label>
-                            <input type="number" step="any" inputmode="decimal" name="bni" id="bni" class="form-control" value="0" required>
-                        </div>
-                        <div class="col">
-                            <label class="form-label">BNIK<span class="text-danger">*</span></label>
-                            <input type="number" step="any" inputmode="decimal" name="bnik" id="bnik" class="form-control" value="0" required>
-                        </div>
+                    <div class="row row-cols-2 row-cols-lg-4 g-2">
+                        <?php foreach ($akun as $a): ?>
+                            <div class="col">
+                                <label class="form-label"><?= html_escape($a['nama']) ?><span class="text-danger">*</span></label>
+                                <input type="number" step="any" inputmode="decimal" name="akun[<?= (int) $a['id'] ?>]" data-nama="<?= html_escape($a['nama']) ?>" class="form-control input-akun" value="0" required>
+                            </div>
+                        <?php endforeach; ?>
                         <div class="col">
                             <label class="form-label">Saldo<span class="text-danger">*</span></label>
                             <input type="text" name="saldo" id="saldo" class="form-control" value="0" readonly>
@@ -170,7 +164,7 @@
         await getdataafkjurnal();
 
         let saldoawal = await afkjurnalgetlastsaldo();
-        $("#saku, #bni, #bnik").on("input", function() {
+        $(".input-akun").on("input", function() {
             updateSaldo(saldoawal);
         });
         $("#catid").on("change", async function() {
@@ -183,16 +177,18 @@
         // benar-benar angka. (Validasi utama tetap di server - lihat _validasiNominal
         // di controller - ini cuma lapisan UX supaya user langsung tahu salahnya di mana)
         $("#tambahafkjurnalModal form").on("submit", function(e) {
-            const fields = ["#saku", "#bni", "#bnik"];
-            for (const sel of fields) {
-                const val = $(sel).val();
+            let valid = true;
+            $(".input-akun").each(function() {
+                const val = $(this).val();
                 if (val === "" || isNaN(val)) {
                     e.preventDefault();
-                    alert("Nilai " + sel.replace('#', '').toUpperCase() + " harus berupa angka.");
-                    $(sel).focus();
-                    return false;
+                    alert("Nilai " + $(this).data('nama') + " harus berupa angka.");
+                    $(this).focus();
+                    valid = false;
+                    return false; // hentikan each
                 }
-            }
+            });
+            return valid;
         });
 
         $("#editafkModal").on('shown.bs.modal', function(e) {
@@ -220,7 +216,7 @@
             });
 
             $.ajax({
-                url: "<?= base_url(); ?>afk/afkjurnalgetlastsaldo",
+                url: "<?= base_url(); ?>afk/afkjurnalgetlastsaldo2",
                 method: "POST",
                 success: function(data) {
                     let saldoawal = parseFloat(data) || 0;
@@ -259,15 +255,16 @@
     }
 
     async function updateSaldo(saldoawal) {
-        let saku = parseFloat($("#saku").val()) || 0;
-        let bni = parseFloat($("#bni").val()) || 0;
-        let bnik = parseFloat($("#bnik").val()) || 0;
+        let total = 0;
+        $(".input-akun").each(function() {
+            total += parseFloat($(this).val()) || 0;
+        });
         let catid = $("#catid").val();
         let io = await afkjurnalgetio(catid);
         let saldo = saldoawal;
 
-        if (io == 'o') saldo -= (saku + bni + bnik);
-        else if (io == 'i') saldo += (saku + bni + bnik);
+        if (io == 'o') saldo -= total;
+        else if (io == 'i') saldo += total;
 
         $("#saldo").val(saldo);
     }

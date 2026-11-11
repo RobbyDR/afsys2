@@ -14,6 +14,187 @@ class Afk extends CI_Controller
         // is_logged_in();
     }
 
+    // ---------------------------------------------------------------
+    // PENGELOLAAN AKUN (tambah, ubah nama/grup/urutan, aktif/nonaktif)
+    // ---------------------------------------------------------------
+    private function _pesanAkun($pesan, $tipe = 'success')
+    {
+        // 'msg' & 'msg_type' ditampilkan oleh V/_partial/header.php
+        $this->session->set_flashdata('msg', $pesan);
+        $this->session->set_flashdata('msg_type', $tipe);
+        redirect('afk/akun');
+    }
+
+    // Ambil & validasi nama/grup/urutan dari POST. Mengembalikan [nama, grup, urutan] atau string pesan error.
+    private function _inputAkun()
+    {
+        $nama = trim((string) $this->input->post('nama', true));
+        if ($nama === '' || strlen($nama) > 63) return 'Nama akun wajib diisi (maksimal 63 karakter).';
+
+        // grup disimpan HURUF BESAR supaya "bni" dan "BNI" tidak dianggap grup berbeda
+        $grup = strtoupper(trim((string) $this->input->post('grup', true)));
+        if (strlen($grup) > 31) return 'Nama grup maksimal 31 karakter.';
+
+        $urutan = trim((string) $this->input->post('urutan', true));
+        if ($urutan === '') {
+            $urutan = $this->Afk_mod->afkakunurutanberikut2();
+        } elseif (!ctype_digit($urutan) || (int) $urutan > 9999) {
+            return 'Urutan harus berupa angka bulat 0 sampai 9999.';
+        }
+        return [$nama, $grup, (int) $urutan];
+    }
+
+    public function akun()
+    {
+        $data['akun'] = $this->Afk_mod->afkgetsaldosemuaakun2(); // semua akun + saldo
+        $data['urutanBerikut'] = $this->Afk_mod->afkakunurutanberikut2();
+        $data['judul'] = 'Kelola Akun';
+        $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();
+        $data['getsubmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'submenu'], 'urutan ASC')->result_array();
+        $data['subview'] = 'afk/akun';
+        $this->load->view('partial', $data);
+    }
+
+    public function akuntambah()
+    {
+        if (!$this->input->post()) redirect('afk/akun');
+
+        // kode = nama teknis tetap (tidak bisa diubah setelah dibuat)
+        $kode = strtolower(trim((string) $this->input->post('kode', true)));
+        if (!preg_match('/^[a-z][a-z0-9]{1,14}$/', $kode)) {
+            $this->_pesanAkun('Kode harus 2-15 karakter: huruf kecil/angka, diawali huruf (contoh: dana, mandiri2).', 'danger');
+        }
+        if ($this->Afk_mod->afkakunkodeada2($kode)) {
+            $this->_pesanAkun("Kode \"$kode\" sudah dipakai akun lain.", 'danger');
+        }
+
+        $in = $this->_inputAkun();
+        if (is_string($in)) $this->_pesanAkun($in, 'danger');
+
+        $this->Afk_mod->afkakuntambah2($kode, $in[0], $in[1], $in[2]);
+        $this->_pesanAkun('Akun "' . $in[0] . '" berhasil ditambahkan.');
+    }
+
+    public function akunedit($id)
+    {
+        if (!$this->input->post()) redirect('afk/akun');
+
+        $ada = array_column($this->Afk_mod->afkgetakun2(), 'id');
+        if (!in_array((string) $id, array_map('strval', $ada), true)) {
+            $this->_pesanAkun('Akun tidak ditemukan.', 'danger');
+        }
+
+        $in = $this->_inputAkun();
+        if (is_string($in)) $this->_pesanAkun($in, 'danger');
+
+        $this->Afk_mod->afkakunedit2($id, $in[0], $in[1], $in[2]);
+        $this->_pesanAkun('Akun "' . $in[0] . '" berhasil diubah.');
+    }
+
+    public function akunaktif($id)
+    {
+        if (!$this->input->post()) redirect('afk/akun');
+
+        $ada = array_column($this->Afk_mod->afkgetakun2(), 'id');
+        if (!in_array((string) $id, array_map('strval', $ada), true)) {
+            $this->_pesanAkun('Akun tidak ditemukan.', 'danger');
+        }
+
+        $aktif = $this->input->post('aktif') == '1';
+        $this->Afk_mod->afkakunaktif2($id, $aktif);
+        $this->_pesanAkun($aktif ? 'Akun diaktifkan.' : 'Akun dinonaktifkan (histori tetap tersimpan).');
+    }
+
+    // Susun data kartu saldo (dipakai dashboard & halaman potret).
+    // $akunSkr = hasil afkgetsaldosemuaakun2(); $akunLalu = [akun_id => saldo pembanding].
+    private function _susunSaldoAkun(array $akunSkr, array $akunLalu)
+    {
+        // Akun satu grup dikumpulkan berdampingan (di posisi anggota pertama) supaya
+        // subtotal grup selalu tampil benar walau 'urutan'-nya tidak berdekatan.
+        $kelompok = [];
+        foreach ($akunSkr as $a) {
+            $kunci = ($a['grup'] !== '') ? 'g:' . $a['grup'] : 'a:' . $a['id'];
+            $kelompok[$kunci][] = $a;
+        }
+        $akunSkr = $kelompok ? array_merge(...array_values($kelompok)) : [];
+
+        $daftarAkun = [];
+        $grupTotal  = [];
+        $superSaldo = 0;
+        $superDelta = 0;
+        foreach ($akunSkr as $a) {
+            $saldo = $a['total'];
+            $lalu  = $akunLalu[$a['id']] ?? 0;
+            // akun nonaktif yang sudah nol disembunyikan
+            if (!$a['aktif'] && $saldo == 0 && $lalu == 0) continue;
+
+            $delta = $saldo - $lalu;
+            $daftarAkun[] = [
+                'id'    => $a['id'],
+                'nama'  => $a['nama'],
+                'grup'  => $a['grup'],
+                'saldo' => $saldo,
+                'delta' => $delta,
+                'state' => $this->Afk_mod->afkgetdeltastate($saldo, $lalu),
+            ];
+
+            if ($a['grup'] !== '') {
+                if (!isset($grupTotal[$a['grup']])) $grupTotal[$a['grup']] = ['saldo' => 0, 'delta' => 0];
+                $grupTotal[$a['grup']]['saldo'] += $saldo;
+                $grupTotal[$a['grup']]['delta'] += $delta;
+            }
+            $superSaldo += $saldo;
+            $superDelta += $delta;
+        }
+        foreach ($grupTotal as &$g) $g['state'] = $this->Afk_mod->afkgetdeltastate($g['delta'], 0);
+        unset($g);
+
+        return [
+            'akunsaldo'  => $daftarAkun,   // urut sesuai tbl_afkakun.urutan
+            'grupTotal'  => $grupTotal,    // subtotal per grup (mis. BNI = bni + bnik)
+            'superSaldo' => $superSaldo,
+            'superDelta' => $superDelta,
+            'superState' => $this->Afk_mod->afkgetdeltastate($superDelta, 0),
+        ];
+    }
+
+    // Potret keuangan: posisi semua akun pada tanggal tertentu (default hari ini).
+    // Dihitung langsung dari transaksi sampai tanggal itu, jadi transaksi sisipan
+    // bertanggal lampau otomatis ikut. Pembanding = akhir bulan sebelum tanggal itu.
+    public function potret($tanggalUrl = null)
+    {
+        try {
+            $date = new DateTime($tanggalUrl ?? date('Y-m-d'));
+        } catch (Exception $e) {
+            show_404();
+            return;
+        }
+        $tanggal        = $date->format('Y-m-d');
+        $awalBulan      = (clone $date)->modify('first day of this month')->format('Y-m-d');
+        $akhirBulanLalu = (new DateTime($awalBulan))->modify('-1 day')->format('Y-m-d');
+
+        $data = $this->_susunSaldoAkun(
+            $this->Afk_mod->afkgetsaldosemuaakun2($tanggal),
+            array_column($this->Afk_mod->afkgetsaldosemuaakun2($akhirBulanLalu), 'total', 'id')
+        );
+
+        // pemasukan/pengeluaran dari awal bulan sampai tanggal itu (pindah uang tidak dihitung)
+        $io = $this->Afk_mod->afkgettotalioperiode($awalBulan, $tanggal);
+        $data['pemasukan']   = $io['in'];
+        $data['pengeluaran'] = abs($io['out']);
+        $data['persenSisa']  = ($io['in'] > 0) ? (($io['in'] + $io['out']) / $io['in']) * 100 : null;
+
+        $data['tanggal']        = $tanggal;
+        $data['awalBulan']      = $awalBulan;
+        $data['akhirBulanLalu'] = $akhirBulanLalu;
+
+        $data['judul'] = 'Potret Keuangan';
+        $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();
+        $data['getsubmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'submenu'], 'urutan ASC')->result_array();
+        $data['subview'] = 'afk/potret';
+        $this->load->view('partial', $data);
+    }
+
     public function index()
     {
         $tanggalskrObj = new DateTime();
@@ -44,24 +225,32 @@ class Afk extends CI_Controller
             $data['datanilai'] = null;
         }
 
-        $data['saldoskrsaku'] = $this->Afk_mod->afkgetsaldoskr('saku');
-        $data['saldoskrbni'] = $this->Afk_mod->afkgetsaldoskr('bni');
-        $data['saldoskrbnik'] = $this->Afk_mod->afkgetsaldoskr('bnik');
+        // Ringkasan pengeluaran & pemasukan hari ini (langsung dari tbl_afkmain,
+        // real-time, tidak perlu tombol refresh dulu)
+        $ioHariIni = $this->Afk_mod->afkgettotalioharian();
+        $data['pemasukanHariIni'] = $ioHariIni['in'];
+        $data['pengeluaranHariIni'] = abs($ioHariIni['out']);
+        $data['persenPengeluaranHariIni'] = ($data['pemasukanHariIni'] > 0)
+            ? ($data['pengeluaranHariIni'] / $data['pemasukanHariIni']) * 100
+            : null; // null = belum ada pemasukan hari ini (persentase tidak terdefinisi)
 
-        $data['bnikstate'] = $this->Afk_mod->afkgetdeltastate($data['saldoskrbnik'], $this->Afk_mod->afkgetsaldo1('bnik'));
-        $data['deltabnik'] = ($data['saldoskrbnik'] - $this->Afk_mod->afkgetsaldo1('bnik'));
+        // Saldo per akun (dinamis: tbl_afkakun + tbl_afkmain_detail), dibandingkan
+        // dengan posisi akhir bulan lalu (berbasis tanggal, aman untuk transaksi sisipan).
+        $akunSkr  = $this->Afk_mod->afkgetsaldosemuaakun2();
+        $akunLalu = array_column(
+            $this->Afk_mod->afkgetsaldosemuaakun2(date('Y-m-t', strtotime('first day of last month'))),
+            'total',
+            'id'
+        );
 
-        $data['bnistate'] = $this->Afk_mod->afkgetdeltastate($data['saldoskrbni'], $this->Afk_mod->afkgetsaldo1('bni'));
-        $data['deltabni'] = ($data['saldoskrbni'] - $this->Afk_mod->afkgetsaldo1('bni'));
+        $data += $this->_susunSaldoAkun($akunSkr, $akunLalu);
 
-        $data['sakustate'] = $this->Afk_mod->afkgetdeltastate($data['saldoskrsaku'], $this->Afk_mod->afkgetsaldo1('saku'));
-        $data['deltasaku'] = ($data['saldoskrsaku'] - $this->Afk_mod->afkgetsaldo1('saku'));
-
-        $data['deltabnibnik'] = $data['deltabni'] + $data['deltabnik'];
-        $data['bnibnikstate'] = $this->Afk_mod->afkgetdeltastate($data['deltabnibnik'], 0);
-
-        $data['deltabnibniksaku'] = $data['deltabnibnik'] + $data['deltasaku'];
-        $data['bnibniksakustate'] = $this->Afk_mod->afkgetdeltastate($data['deltabnibniksaku'], 0);
+        // Indikator sisa uang bulan ini: (pemasukan - pengeluaran) / pemasukan.
+        // Pindah uang antar akun tidak ikut dihitung (bukan io 'i'/'o').
+        $ioBulanIni = $this->Afk_mod->afkgettotalioperiode(date('Y-m-01'), date('Y-m-t'));
+        $data['persenSisaBulanIni'] = ($ioBulanIni['in'] > 0)
+            ? (($ioBulanIni['in'] + $ioBulanIni['out']) / $ioBulanIni['in']) * 100
+            : null; // null = belum ada pemasukan bulan ini
 
         $data['judul'] = "AF - Dashboard Keuangan";
         $data['getmenu'] = $this->sql->select_table('tbl_devmenuaf', ['tbl_devmenuaf.status' => '1', 'tbl_devmenuaf.jenis' => 'menu'], 'urutan ASC')->result_array();
@@ -88,6 +277,7 @@ class Afk extends CI_Controller
         }
 
         $data['getcat'] = $this->Afk_mod->afkgetallcatdata('descvisibility')->result_array();
+        $data['akun'] = $this->Afk_mod->afkgetakun2(true); // akun aktif -> kolom input di form tambah
 
         //PENGATURAN COOKIE
         if (get_cookie('tanggalafkjurnal')) {
@@ -110,10 +300,9 @@ class Afk extends CI_Controller
     {
         $datapost = $this->input->post();
         if ($datapost) {
-            $data['get'] = $this->Afk_mod->afkgetalldatajurnal()->result_array();
-            // $data['get'] = 'robby';
-            // var_dump($data['get']);
-            // die;
+            $data['get'] = $this->Afk_mod->afkgetalldatajurnal2();
+
+            $data['akun'] = $this->Afk_mod->afkgetakununtukbaris2($data['get']);
             $this->load->view('afk/afkgetdatajurnal', $data);
         } else {
             echo 'error1';
@@ -141,27 +330,33 @@ class Afk extends CI_Controller
         }
     }
 
-    // Validasi server-side: saku/bni/bnik WAJIB numerik (boleh minus, boleh 0).
-    // Ini penting karena validasi di form HTML/JS bisa dilewati
-    // (misal request langsung lewat curl/Postman, atau edit devtools).
-    // $checkSaldo=true dipakai di afkjurnaledit() karena field "saldo" di form
-    // itu diisi otomatis oleh JS (updateSaldo()) - kalau JS-nya bermasalah,
-    // ini jadi pagar terakhir supaya nilai rusak (mis. "NaN") tidak tersimpan.
+    // Validasi server-side: setiap nilai akun[<id>] WAJIB numerik (boleh minus, boleh 0).
+    // Penting karena validasi di form HTML/JS bisa dilewati (curl/Postman/devtools).
+    // $checkSaldo=true (dipakai saat edit) juga memeriksa field "saldo" yang diisi
+    // otomatis oleh JS, supaya nilai rusak (mis. "NaN") tidak tersimpan.
     private function _validasiNominal($checkSaldo = false)
     {
-        $fields = ['saku', 'bni', 'bnik'];
-        if ($checkSaldo) $fields[] = 'saldo';
+        $akun = $this->input->post('akun', true);
+        if (!is_array($akun) || !$akun) {
+            $this->session->set_flashdata('error', 'Nilai akun tidak terkirim, data tidak disimpan.');
+            return false;
+        }
 
-        foreach ($fields as $field) {
-            $val = $this->input->post($field, true);
-
+        $nama = array_column($this->Afk_mod->afkgetakun2(), 'nama', 'id');
+        foreach ($akun as $akunId => $val) {
             if (!is_numeric($val)) {
+                $label = $nama[$akunId] ?? ('#' . $akunId);
                 $this->session->set_flashdata(
                     'error',
-                    "Nilai \"$field\" harus berupa angka, tidak boleh huruf/karakter lain (input: \"$val\")"
+                    "Nilai \"$label\" harus berupa angka, tidak boleh huruf/karakter lain (input: \"$val\")"
                 );
                 return false;
             }
+        }
+
+        if ($checkSaldo && !is_numeric($this->input->post('saldo', true))) {
+            $this->session->set_flashdata('error', 'Nilai saldo tidak valid, data tidak disimpan.');
+            return false;
         }
         return true;
     }
@@ -174,8 +369,14 @@ class Afk extends CI_Controller
                 return;
             }
 
-            $this->Afk_mod->afkjurnaltambah();
-            $this->session->set_flashdata('success', 'Berhasil menambahkan data');
+            if ($this->Afk_mod->afkjurnaltambah2()) {
+                // saldo per baris dihitung ulang (urut tanggal) supaya transaksi
+                // sisipan bertanggal lampau langsung benar
+                $this->Afk_mod->afkrefreshallsaldo2();
+                $this->session->set_flashdata('success', 'Berhasil menambahkan data');
+            } else {
+                $this->session->set_flashdata('error', 'Gagal menyimpan data, perubahan dibatalkan.');
+            }
 
             redirect("afk/afkjurnal");
         } else {
@@ -188,7 +389,13 @@ class Afk extends CI_Controller
     {
         if ($this->input->post()) {
             $id = $this->input->post('id');
-            $data['get'] = $this->Afk_mod->afkjurnalgetdatabyid($id);
+            $data['get'] = $this->Afk_mod->afkjurnalgetdatabyid2($id);
+            // akun aktif + akun nonaktif yang punya nilai di transaksi ini (agar tidak hilang saat disimpan)
+            $nilai = $data['get']['nilai'] ?? [];
+            $data['akun'] = array_values(array_filter(
+                $this->Afk_mod->afkgetakun2(),
+                fn($a) => $a['aktif'] || (isset($nilai[$a['id']]) && $nilai[$a['id']] != 0)
+            ));
             // $data['getcat'] = $this->Afk_mod->afkgetallcatdata()->result_array();
             $data['getcat'] = $this->Afk_mod->afkgetallcatdata('descvisibility')->result_array();
             // var_dump($data['get']);
@@ -208,8 +415,12 @@ class Afk extends CI_Controller
             }
 
             //edit update
-            $this->Afk_mod->afkjurnaledit($id);
-            $this->session->set_flashdata('success', 'Berhasil mengubah data');
+            if ($this->Afk_mod->afkjurnaledit2($id)) {
+                $this->Afk_mod->afkrefreshallsaldo2();
+                $this->session->set_flashdata('success', 'Berhasil mengubah data');
+            } else {
+                $this->session->set_flashdata('error', 'Gagal menyimpan perubahan, dibatalkan.');
+            }
 
             redirect("afk/afkjurnal");
         } else {
@@ -218,7 +429,14 @@ class Afk extends CI_Controller
         }
     }
 
+    // Tombol "refresh saldo" sekarang memakai logika baru (akun dinamis).
     public function afkrefreshallsaldo()
+    {
+        $this->afkrefreshallsaldo2();
+    }
+
+    // Versi lama (kolom saku/bni/bnik), disimpan sementara sebagai jalur mundur.
+    public function afkrefreshallsaldo_lama()
     {
         $this->Afk_mod->afkrefreshallsaldo();
         $this->afkupdaterekap(); //sekalian
@@ -228,7 +446,14 @@ class Afk extends CI_Controller
 
     //==========REKAP
 
+    // Tombol "Update Rekap" sekarang memakai logika baru (akun dinamis).
     public function afkupdaterekap()
+    {
+        $this->afkupdaterekap2();
+    }
+
+    // Versi lama (kolom saku/bni/bnik), disimpan sementara sebagai jalur mundur.
+    public function afkupdaterekap_lama()
     {
         $querycat = $this->Afk_mod->afkgetallcatdata()->result_array();
         foreach ($querycat as $row) $this->Afk_mod->afkupdaterekapfast($row['id']);
@@ -258,8 +483,10 @@ class Afk extends CI_Controller
     // =====================================================
     private function _afkupdaterekap2core()
     {
+        // DELETE (bukan TRUNCATE): TRUNCATE itu DDL yang langsung commit dan
+        // tidak bisa di-rollback, sedangkan DELETE ikut transaction.
         $this->db->trans_start();
-        $this->db->truncate('tbl_afkrekap');
+        $this->db->empty_table('tbl_afkrekap');
         $this->Afk_mod->afkupdaterekapfast2();
         $this->db->trans_complete();
 
@@ -534,7 +761,10 @@ class Afk extends CI_Controller
     public function afkrinci($cat, $pilihtahun = null, $pilihbulan = null)
     {
 
-        $data['get'] = $this->Afk_mod->afkgetalldatajurnalbyid($pilihtahun, $pilihbulan, $cat, 'ascid')->result_array();
+        $data['get'] = $this->Afk_mod->afkpasangnilaiakun2(
+            $this->Afk_mod->afkgetalldatajurnalbyid($pilihtahun, $pilihbulan, $cat, 'ascid')->result_array()
+        );
+        $data['akun'] = $this->Afk_mod->afkgetakununtukbaris2($data['get']);
         // var_dump($data['get']);
         // die;
         $data['tahun'] = $pilihtahun;
@@ -927,7 +1157,10 @@ class Afk extends CI_Controller
             $where += ['tbl_afkmain.tanggal' => $this->input->post('tahun') . '-' . $this->input->post('bulan') . '-' . $this->input->post('tanggal')];
         }
 
-        $data['get'] = $this->sql->select_table_join('tbl_afkmain', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkmain.catid', 'LEFT', $where)->result_array();
+        $data['get'] = $this->Afk_mod->afkpasangnilaiakun2(
+            $this->sql->select_table_join('tbl_afkmain', $column, 'tbl_afkcat', 'tbl_afkcat.id=tbl_afkmain.catid', 'LEFT', $where)->result_array()
+        );
+        $data['akun'] = $this->Afk_mod->afkgetakununtukbaris2($data['get']);
         // var_dump($data['get']);
         // die;
         $this->load->view('afk/insightview', $data);
