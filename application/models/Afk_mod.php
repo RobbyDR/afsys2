@@ -97,6 +97,18 @@ class Afk_mod extends CI_model
             ->row_array()['saldo'];
     }
 
+    // AFK2: versi fix, tidak memicu "Undefined array key" saat tbl_afkmain masih kosong
+    public function afkjurnalgetlastsaldo2()
+    {
+        $row = $this->db
+            ->order_by('id', 'DESC')
+            ->from('tbl_afkmain')
+            ->get()
+            ->row_array();
+
+        return $row['saldo'] ?? 0;
+    }
+
     public function afkjurnalgetio($id)
     {
         return $this->db->get_where('tbl_afkcat', ['id' => $id])->row_array()['io'];
@@ -225,225 +237,28 @@ class Afk_mod extends CI_model
         // die;
     }
 
-    public function afkrefreshallsaldobulanan($bulan, $tahun)
+    // AFK2: versi fix & optimasi.
+    // - Pakai 1 query UPDATE...JOIN dengan variable MySQL untuk hitung
+    //   running total, GANTI loop PHP yang tadinya jalankan 1 query
+    //   UPDATE per baris (bisa ribuan query kalau data sudah banyak).
+    // - MySQL otomatis konversi kolom varchar ke angka (DOUBLE) saat
+    //   dipakai operasi aritmatika, jadi nilai desimal tidak terpotong
+    //   seperti pada (int) cast di versi lama.
+    public function afkrefreshallsaldo2()
     {
-        //query dulu
-        $query = $this->db->select('*')->from('tbl_afkmain')->where(['MONTH(tanggal)' => $bulan, 'YEAR(tanggal)' => $tahun])->order_by('id', 'asc')->get()->result_array();
-
-        //foreach
-        $saldo = 0;
-        foreach ($query as $row) {
-            // var_dump($row);
-            // echo '<br>';
-            $saldo = $saldo + (int)$row['saku'] + (int)$row['bni'] + (int)$row['bnik'];
-
-            //update ke tabel
-            $data = [
-                "saldo" => $saldo
-            ];
-
-            $this->db->where('id', $row['id']);
-            $this->db->update('tbl_afkmain', $data);
-        }
-        // die;
+        $this->db->query("SET @running := 0");
+        $this->db->query("
+            UPDATE tbl_afkmain t
+            JOIN (
+                SELECT id, (@running := @running + saku + bni + bnik) AS saldo_baru
+                FROM tbl_afkmain
+                ORDER BY id ASC
+            ) x ON x.id = t.id
+            SET t.saldo = x.saldo_baru
+        ");
     }
 
     //=======REKAP
-    // ADA YANG FAST, INI TIDAK DIPAKAI LAGI
-    // public function afkupdaterekap($catid)
-    // {
-    //     //tentukan jenisnya
-
-    //     //cari tanggal terlama
-    //     $this->db->select_min('tanggal', 'tanggalterlama');
-    //     $this->db->from('tbl_afkmain');
-    //     $query_min = $this->db->get();
-    //     $result_min = $query_min->row();
-    //     $tglterlama = $result_min->tanggalterlama;
-
-    //     //cari tanggal terbaru
-    //     $this->db->select_max('tanggal', 'tanggalterbaru');
-    //     $this->db->from('tbl_afkmain');
-    //     $query_max = $this->db->get();
-    //     $result_max = $query_max->row();
-    //     $tglterbaru = $result_max->tanggalterbaru;
-
-    //     // var_dump($tglterbaru);
-    //     // die;
-
-    //     //FUNGSI HARIAN
-    //     //looping harian
-    //     for ($waktu = strtotime($tglterlama); $waktu <= strtotime($tglterbaru) + 86400; $waktu += 86400) {
-    //         $tanggal = date("Y-m-d", $waktu);
-    //         // echo ($tanggal . ' ');
-    //         // echo ($catid . ' ');
-    //         $querytbl_afkmain = $this->db->select('saku,bni,bnik')->from('tbl_afkmain')->where(['tanggal' => $tanggal, 'catid' => $catid])->get()->result_array();
-    //         $value = 0;
-    //         foreach ($querytbl_afkmain as $row) {
-    //             // if ($catid == "omset") $value += $row['hj'];
-    //             // else if ($catid == "laba") $value += $row['laba'];
-    //             $value += $row['saku'] + $row['bni'] + $row['bnik'];
-    //         }
-    //         // cek pada tanggal tersebut ada jenis, tipewaktu dan waktu yang dimaksud
-    //         $where = [
-    //             'jenis' => $catid,
-    //             'jeniswaktu' => 'harian',
-    //             'waktu' => $tanggal
-    //         ];
-    //         $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->row_array();
-    //         if ($querytbl_afkrekap) {
-    //             // jika ada, update
-
-    //             $data = [
-    //                 "nilai" => $value
-    //             ];
-
-    //             $this->db->where('id', $querytbl_afkrekap['id']);
-    //             $this->db->update('tbl_afkrekap', $data);
-    //         } else {
-    //             // jika tidak ada dan nilai tidaksama dengan 0, insert
-    //             if ($value != 0) {
-    //                 $data = [
-    //                     "jenis" => $catid,
-    //                     "jeniswaktu" => "harian",
-    //                     "waktu" => $tanggal,
-    //                     "nilai" => $value
-    //                 ];
-
-    //                 $this->db->insert('tbl_afkrekap', $data);
-    //                 // echo ($value);
-    //             }
-    //         }
-
-    //         // echo '<br>';
-    //     }
-
-
-    //     // FUNGSI BULANAN
-    //     // analisa $tglterlama dan terbaru
-    //     $tglsatuterlamaDate = new DateTime($tglterlama);
-    //     $tglsatuterlamaDate->modify('first day of this month');
-    //     $tglsatuterbaruDate = new DateTime($tglterbaru);
-    //     $tglsatuterbaruDate->modify('first day of this month');
-
-    //     //looping bulanan
-    //     while ($tglsatuterlamaDate <= $tglsatuterbaruDate) {
-    //         // Lakukan sesuatu dengan tanggal saat ini
-    //         $where = [
-    //             'jenis' => $catid,
-    //             'jeniswaktu' => 'harian',
-    //             'YEAR(waktu)' => $tglsatuterlamaDate->format('Y'),
-    //             'MONTH(waktu)' => $tglsatuterlamaDate->format('m')
-    //         ];
-    //         $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->result_array();
-
-    //         //lakukan penjumlahan harga jual
-    //         $value1 = 0;
-    //         foreach ($querytbl_afkrekap as $row) {
-    //             $value1 += $row['nilai'];
-    //         }
-    //         $bulan1 = $tglsatuterlamaDate->format('Y-m-d');
-
-    //         //lakukan insert/update jika tidak ada atau ada datanya di tbl_afkrekap
-    //         $where = [
-    //             'jenis' => $catid,
-    //             'jeniswaktu' => 'bulanan',
-    //             'waktu' => $bulan1
-    //         ];
-    //         $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->row_array();
-    //         if ($querytbl_afkrekap) {
-    //             // jika ada, update
-
-    //             $data = [
-    //                 "nilai" => $value1
-    //             ];
-
-    //             $this->db->where('id', $querytbl_afkrekap['id']);
-    //             $this->db->update('tbl_afkrekap', $data);
-    //         } else {
-    //             // jika tidak ada dan value tidaksama dengan 0, insert
-    //             if ($value1 != 0) {
-    //                 $data = [
-    //                     "jenis" => $catid,
-    //                     "jeniswaktu" => "bulanan",
-    //                     "waktu" => $bulan1,
-    //                     "nilai" => $value1
-    //                 ];
-
-    //                 $this->db->insert('tbl_afkrekap', $data);
-    //             }
-    //         }
-
-    //         // Tambahkan satu bulan ke tanggal saat ini
-    //         $tglsatuterlamaDate->add(new DateInterval('P1M'));
-    //     }
-    //     // die;
-
-    //     //FUNGSI TAHUNAN
-    //     // cek dan edit $tglterlama dan terbaru menjad 1/1/yyyy
-    //     $tglsatublnsatuterlamaDate = new DateTime($tglterlama);
-    //     $tglsatublnsatuterlamaDate->setDate($tglsatublnsatuterlamaDate->format('Y'), 1, 1);
-    //     $tglsatublnsatuterbaruDate = new DateTime($tglterbaru);
-    //     $tglsatublnsatuterbaruDate->setDate($tglsatublnsatuterbaruDate->format('Y'), 1, 1);
-    //     $tahunterlama = $tglsatublnsatuterlamaDate->format('Y');
-    //     $tahunterbaru = $tglsatublnsatuterbaruDate->format('Y');
-    //     // var_dump($tahunterbaru);
-    //     // die;
-    //     //looping tahunan
-    //     for ($tahun = $tahunterlama; $tahun <= $tahunterbaru; $tahun++) {
-    //         // query dari tbl_afkrekap
-    //         $where = [
-    //             'jenis' => $catid,
-    //             'jeniswaktu' => 'bulanan',
-    //             'YEAR(waktu)' => $tahun
-    //         ];
-    //         $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->result_array();
-
-    //         //akumulasikan
-    //         $value2 = 0;
-    //         foreach ($querytbl_afkrekap as $row) {
-    //             $value2 += $row['nilai'];
-    //         }
-
-    //         //lakukan insert/update jika tidak ada atau ada datanya di tbl_afkrekap
-    //         $tanggal2 = new DateTime($tahun . '-01-01');
-    //         $tanggal2a = $tanggal2->format('Y-m-d');
-    //         $where = [
-    //             'jenis' => $catid,
-    //             'jeniswaktu' => 'tahunan',
-    //             'waktu' => $tanggal2a
-    //         ];
-
-    //         $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->row_array();
-    //         if ($querytbl_afkrekap) {
-    //             // jika ada, update
-
-    //             $data = [
-    //                 "nilai" => $value2
-    //             ];
-
-    //             $this->db->where('id', $querytbl_afkrekap['id']);
-    //             $this->db->update('tbl_afkrekap', $data);
-    //         } else {
-    //             // jika tidak ada, insert
-    //             if ($value2 != 0) {
-    //                 $data = [
-    //                     "jenis" => $catid,
-    //                     "jeniswaktu" => "tahunan",
-    //                     "waktu" => $tanggal2a,
-    //                     "nilai" => $value2
-    //                 ];
-
-    //                 $this->db->insert('tbl_afkrekap', $data);
-
-    //                 //ubah status visibility catid di tbl_afkcat menjadi 1
-    //                 $this->db->where('id', $catid);
-    //                 $this->db->update('tbl_afkcat', ["visibility" => "1"]);
-    //             }
-    //         }
-    //     }
-    // }
-
     public function afkupdaterekapfast($catid)
     {
         // === 1️⃣ Harian ===
@@ -510,225 +325,79 @@ class Afk_mod extends CI_model
 
 
 
-    public function afkupdaterekapbulanan($catid, $tanggalparam, $range = null)
+    // =====================================================
+    // AFK2 - versi baru: generate ULANG SEMUA kategori sekaligus.
+    // Dipakai SETELAH tbl_afkrekap di-TRUNCATE (lihat afkupdaterekap2()
+    // di controller). Karena tabel kosong saat insert, tidak perlu
+    // ON DUPLICATE KEY UPDATE lagi -> tidak butuh unique key khusus,
+    // dan tidak ada resiko data dobel seperti afkupdaterekapfast().
+    // =====================================================
+    public function afkupdaterekapfast2()
     {
-        $tglterlama1 = new DateTime($tanggalparam);
-        if (!$range) { //tanggal terlama adalah 1
-            $tglterlama1->modify('first day of this month');
-        } else {
-            // $tglterlama1->modify('-{$range} days');
-            $tglterlama1->modify('-7 days');
-        }
-        $tglterlama = $tglterlama1->format('Y-m-d');
+        // === 1️⃣ Harian (semua kategori) ===
+        $sql_harian = "
+        INSERT INTO tbl_afkrekap (jenis, jeniswaktu, waktu, nilai)
+        SELECT 
+            catid AS jenis,
+            'harian' AS jeniswaktu,
+            tanggal AS waktu,
+            SUM(saku + bni + bnik) AS nilai
+        FROM tbl_afkmain
+        GROUP BY tanggal, catid
+    ";
+        $this->db->query($sql_harian);
 
-        //tanggal terbaru adalah $tanggalparam
-        $tglterbaru = $tanggalparam;
+        // === 2️⃣ Bulanan (semua kategori) ===
+        $sql_bulanan = "
+        INSERT INTO tbl_afkrekap (jenis, jeniswaktu, waktu, nilai)
+        SELECT 
+            catid AS jenis,
+            'bulanan' AS jeniswaktu,
+            DATE_FORMAT(tanggal, '%Y-%m-01') AS waktu,
+            SUM(saku + bni + bnik) AS nilai
+        FROM tbl_afkmain
+        GROUP BY YEAR(tanggal), MONTH(tanggal), catid
+    ";
+        $this->db->query($sql_bulanan);
 
-        //FUNGSI HARIAN
-        //looping harian
-        for ($waktu = strtotime($tglterlama); $waktu <= strtotime($tglterbaru); $waktu += 86400) {
-            $tanggal = date("Y-m-d", $waktu);
-            $querytbl_afkmain = $this->db->select('saku,bni,bnik')->from('tbl_afkmain')->where(['tanggal' => $tanggal, 'catid' => $catid])->get()->result_array();
-            $value = 0;
-            foreach ($querytbl_afkmain as $row) {
-                // if ($catid == "omset") $value += $row['hj'];
-                // else if ($catid == "laba") $value += $row['laba'];
-                $value += $row['saku'] + $row['bni'] + $row['bnik'];
-            }
-            // cek pada tanggal tersebut ada jenis, tipewaktu dan waktu yang dimaksud
-            $where = [
-                'jenis' => $catid,
-                'jeniswaktu' => 'harian',
-                'waktu' => $tanggal
-            ];
-            $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->row_array();
-            if ($querytbl_afkrekap) {
-                // jika ada, update
+        // === 3️⃣ Tahunan (semua kategori) ===
+        $sql_tahunan = "
+        INSERT INTO tbl_afkrekap (jenis, jeniswaktu, waktu, nilai)
+        SELECT 
+            catid AS jenis,
+            'tahunan' AS jeniswaktu,
+            DATE_FORMAT(tanggal, '%Y-01-01') AS waktu,
+            SUM(saku + bni + bnik) AS nilai
+        FROM tbl_afkmain
+        GROUP BY YEAR(tanggal), catid
+    ";
+        $this->db->query($sql_tahunan);
 
-                $data = [
-                    "nilai" => $value
-                ];
+        // === 4️⃣ 4EVER (semua kategori) ===
+        $sql_4ever = "
+        INSERT INTO tbl_afkrekap (jenis, jeniswaktu, waktu, nilai)
+        SELECT
+            catid AS jenis,
+            '4ever' AS jeniswaktu,
+            MIN(DATE_FORMAT(tanggal, '%Y-01-01')) AS waktu,
+            SUM(saku + bni + bnik) AS nilai
+        FROM tbl_afkmain
+        GROUP BY catid
+    ";
+        $this->db->query($sql_4ever);
 
-                $this->db->where('id', $querytbl_afkrekap['id']);
-                $this->db->update('tbl_afkrekap', $data);
-            } else {
-                // jika tidak ada dan nilai tidaksama dengan 0, insert
-                if ($value != 0) {
-                    $data = [
-                        "jenis" => $catid,
-                        "jeniswaktu" => "harian",
-                        "waktu" => $tanggal,
-                        "nilai" => $value
-                    ];
+        // Reset dulu semua ke 0, baru set 1 utk kategori yang benar-benar
+        // masih punya transaksi. Ini supaya kategori yang datanya sudah
+        // dihapus semua tidak "nyangkut" tampil terus (visibility lama
+        // cuma di-set ke 1 saat insert, tidak pernah direset ke 0).
+        $this->db->query("UPDATE tbl_afkcat SET visibility = '0'");
 
-                    $this->db->insert('tbl_afkrekap', $data);
-                }
-            }
-        }
-
-        // FUNGSI BULANAN
-        // analisa $tglterlama dan terbaru
-        $tglsatuterlamaDate = new DateTime($tglterlama);
-        $tglsatuterlamaDate->modify('first day of this month');
-        $tglsatuterbaruDate = new DateTime($tglterbaru);
-        $tglsatuterbaruDate->modify('first day of this month');
-
-        //looping bulanan
-        while ($tglsatuterlamaDate <= $tglsatuterbaruDate) {
-            // Lakukan sesuatu dengan tanggal saat ini
-            $where = [
-                'jenis' => $catid,
-                'jeniswaktu' => 'harian',
-                'YEAR(waktu)' => $tglsatuterlamaDate->format('Y'),
-                'MONTH(waktu)' => $tglsatuterlamaDate->format('m')
-            ];
-            $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->result_array();
-
-            //lakukan penjumlahan nilai
-            $value1 = 0;
-            foreach ($querytbl_afkrekap as $row) {
-                $value1 += $row['nilai'];
-            }
-            $bulan1 = $tglsatuterlamaDate->format('Y-m-d');
-
-            //lakukan insert/update jika tidak ada atau ada datanya di tbl_afkrekap
-            $where = [
-                'jenis' => $catid,
-                'jeniswaktu' => 'bulanan',
-                'waktu' => $bulan1
-            ];
-            $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->row_array();
-            if ($querytbl_afkrekap) {
-                // jika ada, update
-
-                $data = [
-                    "nilai" => $value1
-                ];
-
-                $this->db->where('id', $querytbl_afkrekap['id']);
-                $this->db->update('tbl_afkrekap', $data);
-            } else {
-                // jika tidak ada dan value tidaksama dengan 0, insert
-                if ($value1 != 0) {
-                    $data = [
-                        "jenis" => $catid,
-                        "jeniswaktu" => "bulanan",
-                        "waktu" => $bulan1,
-                        "nilai" => $value1
-                    ];
-
-                    $this->db->insert('tbl_afkrekap', $data);
-                }
-            }
-
-            // Tambahkan satu bulan ke tanggal saat ini
-            $tglsatuterlamaDate->add(new DateInterval('P1M'));
-        }
-        // die;
-
-        //FUNGSI TAHUNAN
-        // cek dan edit $tglterlama dan terbaru menjad 1/1/yyyy
-        $tglsatublnsatuterlamaDate = new DateTime($tglterlama);
-        $tglsatublnsatuterlamaDate->setDate($tglsatublnsatuterlamaDate->format('Y'), 1, 1);
-        $tglsatublnsatuterbaruDate = new DateTime($tglterbaru);
-        $tglsatublnsatuterbaruDate->setDate($tglsatublnsatuterbaruDate->format('Y'), 1, 1);
-        $tahunterlama = $tglsatublnsatuterlamaDate->format('Y');
-        $tahunterbaru = $tglsatublnsatuterbaruDate->format('Y');
-        // var_dump($tahunterbaru);
-        // die;
-        //looping tahunan
-        for ($tahun = $tahunterlama; $tahun <= $tahunterbaru; $tahun++) {
-            // query dari tbl_afkrekap
-            $where = [
-                'jenis' => $catid,
-                'jeniswaktu' => 'bulanan',
-                'YEAR(waktu)' => $tahun
-            ];
-            $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->result_array();
-
-            //akumulasikan
-            $value2 = 0;
-            foreach ($querytbl_afkrekap as $row) {
-                $value2 += $row['nilai'];
-            }
-
-            //lakukan insert/update jika tidak ada atau ada datanya di tbl_afkrekap
-            $tanggal2 = new DateTime($tahun . '-01-01');
-            $tanggal2a = $tanggal2->format('Y-m-d');
-            $where = [
-                'jenis' => $catid,
-                'jeniswaktu' => 'tahunan',
-                'waktu' =>  $tanggal2a
-            ];
-
-            $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->row_array();
-            if ($querytbl_afkrekap) {
-                // jika ada, update
-
-                $data = [
-                    "nilai" => $value2
-                ];
-
-                $this->db->where('id', $querytbl_afkrekap['id']);
-                $this->db->update('tbl_afkrekap', $data);
-            } else {
-                // jika tidak ada, insert
-                if ($value2 != 0) {
-                    $data = [
-                        "jenis" => $catid,
-                        "jeniswaktu" => "tahunan",
-                        "waktu" => $tanggal2a,
-                        "nilai" => $value2
-                    ];
-
-                    $this->db->insert('tbl_afkrekap', $data);
-                }
-            }
-        }
-
-        // UPDATE 4EVER
-        $where = [
-            'jenis' => $catid,
-            'jeniswaktu' => 'tahunan'
-        ];
-        $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->result_array();
-
-        $value3 = 0;
-        foreach ($querytbl_afkrekap as $row) :
-            $value3 += $row['nilai'];
-        endforeach;
-
-        //lakukan insert/update jika tidak ada atau ada datanya di tbl_afkrekap
-        $tanggal3 = new DateTime($tahun . '-01-01');
-        $tanggal3a = $tanggal3->format('Y-m-d');
-        $where = [
-            'jenis' => $catid,
-            'jeniswaktu' => '4ever'
-        ];
-
-        $querytbl_afkrekap = $this->db->select('*')->from('tbl_afkrekap')->where($where)->get()->row_array();
-        if ($querytbl_afkrekap) {
-            // jika ada, update
-
-            $data = [
-                "nilai" => $value3
-            ];
-
-            $this->db->where('id', $querytbl_afkrekap['id']);
-            $this->db->update('tbl_afkrekap', $data);
-        } else {
-            // jika tidak ada, insert
-            if ($value3 != 0) {
-                $data = [
-                    "jenis" => $catid,
-                    "jeniswaktu" => "4ever",
-                    "waktu" => $tanggal3a,
-                    "nilai" => $value3
-                ];
-
-                $this->db->insert('tbl_afkrekap', $data);
-            }
-        }
+        $sql_visibility = "
+        UPDATE tbl_afkcat
+        SET visibility = '1'
+        WHERE id IN (SELECT DISTINCT catid FROM tbl_afkmain)
+    ";
+        $this->db->query($sql_visibility);
     }
 
     //====REKAP
@@ -840,6 +509,36 @@ class Afk_mod extends CI_model
         // var_dump($query);
         // die;
         return $query;
+    }
+
+    // AFK2: versi fix - kalau bulan sebelumnya belum ada data sama sekali
+    // (misal baru mulai pakai aplikasi), langsung return 0 daripada
+    // memicu "Undefined array key 'id'".
+    public function afkgetsaldo1_2($entitas)
+    {
+        $tanggal = date('Y-m-d');
+        $tanggal1 = new DateTime($tanggal);
+        $tanggal1->sub(new DateInterval('P1M'));
+        $tahun = $tanggal1->format('Y');
+        $bulan = $tanggal1->format('m');
+
+        $where = ['MONTH(tanggal)' => $bulan, 'YEAR(tanggal)' => $tahun];
+        $query = $this->db->select('*')
+            ->from('tbl_afkmain')
+            ->where($where)
+            ->order_by('id', 'desc')
+            ->get()->row_array();
+
+        if (empty($query)) {
+            return 0;
+        }
+
+        $id = $query['id'];
+        $this->db->select_sum($entitas);
+        $this->db->where('id <=', $id);
+        $result = $this->db->get('tbl_afkmain')->row_array();
+
+        return $result[$entitas] ?? 0;
     }
 
     public function afkgetdeltastate($dataskr, $datadulu)

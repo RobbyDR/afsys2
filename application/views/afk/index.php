@@ -24,8 +24,6 @@
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="btnGroupDrop1">
                             <li><a class="dropdown-item" href="#" id="updaterekap">Update Rekap Keseluruhan</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="updaterekap2">Update Rekap Bulanan</a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="updaterekap3">Update Rekap Lampau</a></li>
                         </ul>
                     </div>
                 </div>
@@ -206,8 +204,6 @@
             window.location.href = '<?= base_url('afk/grafik') ?>';
         });
         $("#updaterekap").click(() => window.location.href = '<?= base_url('afk/afkupdaterekap') ?>');
-        $("#updaterekap2").click(() => window.location.href = '<?= base_url('afk/afkupdaterekapbulanan') ?>');
-        $("#updaterekap3").click(() => window.location.href = '<?= base_url('afk/afkupdaterekaplampau') ?>');
 
         $("#pilihbulan, #pilihtahun").on("change", afkgetrekaptanggal);
         $("#pilihtahun2").on("change", afkgetrekapbulan);

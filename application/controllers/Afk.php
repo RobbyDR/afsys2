@@ -125,6 +125,12 @@ class Afk extends CI_Controller
         echo $this->Afk_mod->afkjurnalgetlastsaldo();
     }
 
+    // AFK2: versi fix, tidak error kalau tbl_afkmain masih kosong
+    public function afkjurnalgetlastsaldo2()
+    {
+        echo $this->Afk_mod->afkjurnalgetlastsaldo2();
+    }
+
     public function afkjurnalgetio()
     {
         $datapost = $this->input->post();
@@ -135,9 +141,39 @@ class Afk extends CI_Controller
         }
     }
 
+    // Validasi server-side: saku/bni/bnik WAJIB numerik (boleh minus, boleh 0).
+    // Ini penting karena validasi di form HTML/JS bisa dilewati
+    // (misal request langsung lewat curl/Postman, atau edit devtools).
+    // $checkSaldo=true dipakai di afkjurnaledit() karena field "saldo" di form
+    // itu diisi otomatis oleh JS (updateSaldo()) - kalau JS-nya bermasalah,
+    // ini jadi pagar terakhir supaya nilai rusak (mis. "NaN") tidak tersimpan.
+    private function _validasiNominal($checkSaldo = false)
+    {
+        $fields = ['saku', 'bni', 'bnik'];
+        if ($checkSaldo) $fields[] = 'saldo';
+
+        foreach ($fields as $field) {
+            $val = $this->input->post($field, true);
+
+            if (!is_numeric($val)) {
+                $this->session->set_flashdata(
+                    'error',
+                    "Nilai \"$field\" harus berupa angka, tidak boleh huruf/karakter lain (input: \"$val\")"
+                );
+                return false;
+            }
+        }
+        return true;
+    }
+
     public function afkjurnaltambah()
     {
         if ($this->input->post()) {
+            if (!$this->_validasiNominal()) {
+                redirect("afk/afkjurnal");
+                return;
+            }
+
             $this->Afk_mod->afkjurnaltambah();
             $this->session->set_flashdata('success', 'Berhasil menambahkan data');
 
@@ -166,6 +202,11 @@ class Afk extends CI_Controller
     public function afkjurnaledit($id)
     {
         if ($this->input->post()) {
+            if (!$this->_validasiNominal(true)) {
+                redirect("afk/afkjurnal");
+                return;
+            }
+
             //edit update
             $this->Afk_mod->afkjurnaledit($id);
             $this->session->set_flashdata('success', 'Berhasil mengubah data');
@@ -182,19 +223,6 @@ class Afk extends CI_Controller
         $this->Afk_mod->afkrefreshallsaldo();
         $this->afkupdaterekap(); //sekalian
         $this->session->set_flashdata('success', 'Berhasil refresh saldo');
-        redirect("afk/afkjurnal");
-    }
-
-    public function afkrefreshallsaldobulanan($tanggal = null)
-    {
-        if ($tanggal == null) {
-            $bulan = date('m');
-            $tahun = date('Y');
-        }
-
-        $this->Afk_mod->afkrefreshallsaldobulanan($bulan, $tahun);
-
-        $this->session->set_flashdata('success', 'Berhasil refreshsaldo bulanan');
         redirect("afk/afkjurnal");
     }
 
@@ -218,27 +246,59 @@ class Afk extends CI_Controller
         }
     }
 
-    public function afkupdaterekapbulanan($tanggal = null)
+    // =====================================================
+    // AFK2 - versi baru refresh rekap: TRUNCATE tbl_afkrekap
+    // lalu generate ulang dari awal (sekali jalan, semua kategori).
+    // Menggantikan pendekatan lama yang pakai ON DUPLICATE KEY UPDATE
+    // (rawan dobel karena tbl_afkrekap tidak punya unique key).
+    //
+    // Dibungkus transaction: kalau ada query yang gagal di tengah
+    // proses (truncate sudah jalan tapi generate ulang gagal), semua
+    // otomatis di-rollback, jadi data lama tidak hilang setengah-setengah.
+    // =====================================================
+    private function _afkupdaterekap2core()
     {
-        if ($tanggal == null) $tanggal = date('Y-m-d');
+        $this->db->trans_start();
+        $this->db->truncate('tbl_afkrekap');
+        $this->Afk_mod->afkupdaterekapfast2();
+        $this->db->trans_complete();
 
-        $querycat = $this->Afk_mod->afkgetallcatdata()->result_array();
-        foreach ($querycat as $row) $this->Afk_mod->afkupdaterekapbulanan($row['id'], $tanggal);
-
-        $this->session->set_flashdata('success', 'Berhasil update rekap bulanan');
-        redirect("afk/index");
+        return $this->db->trans_status(); // true kalau sukses, false kalau di-rollback
     }
 
-    public function afkupdaterekaplampau()
+    public function afkupdaterekap2()
     {
-        $tanggal = date('Y-m-d');
-        $tanggal = date('Y-m-d', strtotime($tanggal . ' +1 day'));
+        $ok = $this->_afkupdaterekap2core();
 
-        $querycat = $this->Afk_mod->afkgetallcatdata()->result_array();
-        foreach ($querycat as $row) $this->Afk_mod->afkupdaterekapbulanan($row['id'], $tanggal, '7');
+        if ($ok) {
+            $this->session->set_flashdata('success', 'Berhasil update rekap (v2)');
+        } else {
+            $this->session->set_flashdata('error', 'Gagal update rekap, perubahan dibatalkan (rollback). Data lama tetap aman.');
+        }
 
-        $this->session->set_flashdata('success', 'Berhasil update rekap bulanan');
-        redirect("afk/index");
+        $referer = $this->input->server('HTTP_REFERER');
+        if (!empty($referer)) {
+            redirect($referer);
+        } else {
+            redirect("afk/index");
+        }
+    }
+
+    public function afkrefreshallsaldo2()
+    {
+        $this->db->trans_start();
+        $this->Afk_mod->afkrefreshallsaldo2();
+        $this->db->trans_complete();
+        $saldoOk = $this->db->trans_status();
+
+        $rekapOk = $this->_afkupdaterekap2core(); // sekalian generate ulang rekap
+
+        if ($saldoOk && $rekapOk) {
+            $this->session->set_flashdata('success', 'Berhasil refresh saldo (v2)');
+        } else {
+            $this->session->set_flashdata('error', 'Sebagian proses refresh gagal, perubahan yang gagal sudah di-rollback.');
+        }
+        redirect("afk/afkjurnal");
     }
 
     //===REKAP
@@ -487,6 +547,44 @@ class Afk extends CI_Controller
         $this->load->view('partial', $data);
     }
 
+    // AFK2: helper untuk insight() - ambil data 1 periode (harian/bulanan/
+    // tahunan/4ever) dalam SATU query (gabung IN & OUT), lalu dipisah di PHP.
+    // Menggantikan pola lama yang query IN & OUT terpisah (2x query per periode).
+    private function _insightPeriod($jeniswaktu, $waktu = null)
+    {
+        $where = ['tbl_afkrekap.jeniswaktu' => $jeniswaktu];
+        if ($waktu !== null) $where['tbl_afkrekap.waktu'] = $waktu;
+
+        $rows = $this->sql->select_table_join(
+            'tbl_afkrekap',
+            '
+            tbl_afkrekap.jenis   AS jenis,
+            tbl_afkrekap.nilai   AS nilai,
+            tbl_afkcat.io        AS io,
+            tbl_afkcat.deskripsi AS deskripsi,
+            tbl_afkcat.cat       AS cat
+        ',
+            'tbl_afkcat',
+            'tbl_afkcat.id = tbl_afkrekap.jenis',
+            'LEFT',
+            $where,
+            'CONVERT(nilai, SIGNED) ASC'
+        )->result_array();
+
+        $rowsOut = array_values(array_filter($rows, fn($r) => $r['io'] === 'o'));
+        $rowsIn  = array_filter($rows, fn($r) => $r['io'] === 'i');
+
+        $out = array_sum(array_column($rowsOut, 'nilai'));
+        $in  = array_sum(array_column($rowsIn, 'nilai'));
+
+        return [
+            'rows_out' => $rowsOut, // dipakai utk tabel/donat (pengeluaran per kategori)
+            'out'      => $out,
+            'in'       => $in,
+            'saldo'    => $in + $out,
+        ];
+    }
+
     public function insight($tanggalUrl = null)
     {
         // =====================================================
@@ -516,164 +614,35 @@ class Afk extends CI_Controller
         $data['tanggal_full'] = $date->format('Y-m-d');
 
         // =====================================================
-        // 3. KONFIG UMUM QUERY
+        // 3. HARIAN / BULANAN / TAHUNAN / 4EVER
+        // (masing-masing 1 query saja, gabungan IN+OUT)
         // =====================================================
-        $column = '
-        tbl_afkrekap.jenis  AS jenis,
-        tbl_afkrekap.nilai  AS nilai,
-        tbl_afkcat.deskripsi AS deskripsi,
-        tbl_afkcat.cat      AS cat
-    ';
-        $order_by = 'CONVERT(nilai, SIGNED) ASC';
+        $hari = $this->_insightPeriod('harian', $waktuhari);
+        $data['gethari']   = $hari['rows_out'];
+        $data['OUThari']   = $hari['out'];
+        $data['INhari']    = $hari['in'];
+        $data['SALDOhari'] = $hari['saldo'];
 
-        // =====================================================
-        // 4. HARIAN
-        // =====================================================
-        $data['gethari'] = $this->sql->select_table_join(
-            'tbl_afkrekap',
-            $column,
-            'tbl_afkcat',
-            'tbl_afkcat.id = tbl_afkrekap.jenis',
-            'LEFT',
-            [
-                'tbl_afkrekap.jeniswaktu' => 'harian',
-                'tbl_afkrekap.waktu'      => $waktuhari,
-                'tbl_afkcat.io'           => 'o'
-            ],
-            $order_by
-        )->result_array();
+        $bln = $this->_insightPeriod('bulanan', $waktuBulan);
+        $data['get']        = $bln['rows_out'];
+        $data['OUTbulan']   = $bln['out'];
+        $data['INbulan']    = $bln['in'];
+        $data['SALDObulan'] = $bln['saldo'];
 
-        $data['OUThari'] = array_sum(array_column($data['gethari'], 'nilai'));
+        $thn = $this->_insightPeriod('tahunan', $waktuTahun);
+        $data['gettahun']   = $thn['rows_out'];
+        $data['OUTtahun']   = $thn['out'];
+        $data['INtahun']    = $thn['in'];
+        $data['SALDOtahun'] = $thn['saldo'];
 
-        $data['INhari'] = array_sum(array_column(
-            $this->sql->select_table_join(
-                'tbl_afkrekap',
-                'tbl_afkrekap.nilai AS nilai',
-                'tbl_afkcat',
-                'tbl_afkcat.id = tbl_afkrekap.jenis',
-                'LEFT',
-                [
-                    'tbl_afkrekap.jeniswaktu' => 'harian',
-                    'tbl_afkrekap.waktu'      => $waktuhari,
-                    'tbl_afkcat.io'           => 'i'
-                ]
-            )->result_array(),
-            'nilai'
-        ));
-
-        $data['SALDOhari'] = $data['INhari'] + $data['OUThari'];
+        $ever = $this->_insightPeriod('4ever', null);
+        $data['get4ever']   = $ever['rows_out'];
+        $data['OUT4ever']   = $ever['out'];
+        $data['IN4ever']    = $ever['in'];
+        $data['SALDO4ever'] = $ever['saldo'];
 
         // =====================================================
-        // 5. BULANAN
-        // =====================================================
-        $data['get'] = $this->sql->select_table_join(
-            'tbl_afkrekap',
-            $column,
-            'tbl_afkcat',
-            'tbl_afkcat.id = tbl_afkrekap.jenis',
-            'LEFT',
-            [
-                'tbl_afkrekap.jeniswaktu' => 'bulanan',
-                'tbl_afkrekap.waktu'      => $waktuBulan,
-                'tbl_afkcat.io'           => 'o'
-            ],
-            $order_by
-        )->result_array();
-
-        $data['OUTbulan'] = array_sum(array_column($data['get'], 'nilai'));
-
-        $data['INbulan'] = array_sum(array_column(
-            $this->sql->select_table_join(
-                'tbl_afkrekap',
-                'tbl_afkrekap.nilai AS nilai',
-                'tbl_afkcat',
-                'tbl_afkcat.id = tbl_afkrekap.jenis',
-                'LEFT',
-                [
-                    'tbl_afkrekap.jeniswaktu' => 'bulanan',
-                    'tbl_afkrekap.waktu'      => $waktuBulan,
-                    'tbl_afkcat.io'           => 'i'
-                ]
-            )->result_array(),
-            'nilai'
-        ));
-
-        $data['SALDObulan'] = $data['INbulan'] + $data['OUTbulan'];
-
-        // =====================================================
-        // 6. TAHUNAN
-        // =====================================================
-        $data['gettahun'] = $this->sql->select_table_join(
-            'tbl_afkrekap',
-            $column,
-            'tbl_afkcat',
-            'tbl_afkcat.id = tbl_afkrekap.jenis',
-            'LEFT',
-            [
-                'tbl_afkrekap.jeniswaktu' => 'tahunan',
-                'tbl_afkrekap.waktu'      => $waktuTahun,
-                'tbl_afkcat.io'           => 'o'
-            ],
-            $order_by
-        )->result_array();
-
-        $data['OUTtahun'] = array_sum(array_column($data['gettahun'], 'nilai'));
-
-        $data['INtahun'] = array_sum(array_column(
-            $this->sql->select_table_join(
-                'tbl_afkrekap',
-                'tbl_afkrekap.nilai AS nilai',
-                'tbl_afkcat',
-                'tbl_afkcat.id = tbl_afkrekap.jenis',
-                'LEFT',
-                [
-                    'tbl_afkrekap.jeniswaktu' => 'tahunan',
-                    'tbl_afkrekap.waktu'      => $waktuTahun,
-                    'tbl_afkcat.io'           => 'i'
-                ]
-            )->result_array(),
-            'nilai'
-        ));
-
-        $data['SALDOtahun'] = $data['INtahun'] + $data['OUTtahun'];
-
-        // =====================================================
-        // 7. 4EVER
-        // =====================================================
-        $data['get4ever'] = $this->sql->select_table_join(
-            'tbl_afkrekap',
-            $column,
-            'tbl_afkcat',
-            'tbl_afkcat.id = tbl_afkrekap.jenis',
-            'LEFT',
-            [
-                'tbl_afkrekap.jeniswaktu' => '4ever',
-                'tbl_afkcat.io'           => 'o'
-            ],
-            $order_by
-        )->result_array();
-
-        $data['OUT4ever'] = array_sum(array_column($data['get4ever'], 'nilai'));
-
-        $data['IN4ever'] = array_sum(array_column(
-            $this->sql->select_table_join(
-                'tbl_afkrekap',
-                'tbl_afkrekap.nilai AS nilai',
-                'tbl_afkcat',
-                'tbl_afkcat.id = tbl_afkrekap.jenis',
-                'LEFT',
-                [
-                    'tbl_afkrekap.jeniswaktu' => '4ever',
-                    'tbl_afkcat.io'           => 'i'
-                ]
-            )->result_array(),
-            'nilai'
-        ));
-
-        $data['SALDO4ever'] = $data['IN4ever'] + $data['OUT4ever'];
-
-        // =====================================================
-        // 8. VIEW
+        // 4. VIEW
         // =====================================================
         $data['judul'] = 'Wawasan';
         $data['getmenu'] = $this->sql->select_table(
@@ -1318,29 +1287,53 @@ class Afk extends CI_Controller
 
         $cache = $this->session->userdata('afk_insight_cache');
 
-        if (!$cache) {
-            show_error('Data insight belum tersedia');
-        }
+        if ($cache) {
+            switch ($jeniswaktu) {
+                case 'harian':
+                    $rows  = $cache['gethari'];
+                    $judul = "Donat Pengeluaran Harian";
+                    break;
 
-        switch ($jeniswaktu) {
-            case 'harian':
-                $rows  = $cache['gethari'];
-                $judul = "Donat Pengeluaran Harian";
-                break;
+                case 'bulanan':
+                    $rows  = $cache['get'];
+                    $judul = "Donat Pengeluaran Bulanan";
+                    break;
 
-            case 'bulanan':
-                $rows  = $cache['get'];
-                $judul = "Donat Pengeluaran Bulanan";
-                break;
+                case 'tahunan':
+                    $rows  = $cache['gettahun'];
+                    $judul = "Donat Pengeluaran Tahunan";
+                    break;
 
-            case 'tahunan':
-                $rows  = $cache['gettahun'];
-                $judul = "Donat Pengeluaran Tahunan";
-                break;
+                default: // 4ever
+                    $rows  = $cache['get4ever'];
+                    $judul = "Donat Pengeluaran 4EVER";
+            }
+        } else {
+            // AFK2: fallback - session cache kosong (expired / donat dibuka
+            // langsung tanpa lewat afk/insight dulu). Hitung ulang dari DB
+            // pakai tanggal hari ini, daripada langsung error ke user.
+            $today = new DateTime();
+            switch ($jeniswaktu) {
+                case 'harian':
+                    $period = $this->_insightPeriod('harian', $today->format('Y-m-d'));
+                    $judul  = "Donat Pengeluaran Harian";
+                    break;
 
-            default: // 4ever
-                $rows  = $cache['get4ever'];
-                $judul = "Donat Pengeluaran 4EVER";
+                case 'bulanan':
+                    $period = $this->_insightPeriod('bulanan', $today->format('Y-m-01'));
+                    $judul  = "Donat Pengeluaran Bulanan";
+                    break;
+
+                case 'tahunan':
+                    $period = $this->_insightPeriod('tahunan', $today->format('Y-01-01'));
+                    $judul  = "Donat Pengeluaran Tahunan";
+                    break;
+
+                default: // 4ever
+                    $period = $this->_insightPeriod('4ever', null);
+                    $judul  = "Donat Pengeluaran 4EVER";
+            }
+            $rows = $period['rows_out'];
         }
 
         $this->load->view('afk/donat', [

@@ -126,15 +126,15 @@
                     <div class="row">
                         <div class="col">
                             <label class="form-label">Saku<span class="text-danger">*</span></label>
-                            <input type="text" name="saku" id="saku" class="form-control" value="0" required>
+                            <input type="number" step="any" inputmode="decimal" name="saku" id="saku" class="form-control" value="0" required>
                         </div>
                         <div class="col">
                             <label class="form-label">BNI<span class="text-danger">*</span></label>
-                            <input type="text" name="bni" id="bni" class="form-control" value="0" required>
+                            <input type="number" step="any" inputmode="decimal" name="bni" id="bni" class="form-control" value="0" required>
                         </div>
                         <div class="col">
                             <label class="form-label">BNIK<span class="text-danger">*</span></label>
-                            <input type="text" name="bnik" id="bnik" class="form-control" value="0" required>
+                            <input type="number" step="any" inputmode="decimal" name="bnik" id="bnik" class="form-control" value="0" required>
                         </div>
                         <div class="col">
                             <label class="form-label">Saldo<span class="text-danger">*</span></label>
@@ -178,7 +178,22 @@
         });
 
         $("#updatesaldo").click(() => window.location.href = '<?= base_url('afk/afkrefreshallsaldo') ?>');
-        $("#updatesaldo2").click(() => window.location.href = '<?= base_url('afk/afkrefreshallsaldobulanan') ?>');
+
+        // Validasi tambahan sebelum submit form Tambah: pastikan saku/bni/bnik
+        // benar-benar angka. (Validasi utama tetap di server - lihat _validasiNominal
+        // di controller - ini cuma lapisan UX supaya user langsung tahu salahnya di mana)
+        $("#tambahafkjurnalModal form").on("submit", function(e) {
+            const fields = ["#saku", "#bni", "#bnik"];
+            for (const sel of fields) {
+                const val = $(sel).val();
+                if (val === "" || isNaN(val)) {
+                    e.preventDefault();
+                    alert("Nilai " + sel.replace('#', '').toUpperCase() + " harus berupa angka.");
+                    $(sel).focus();
+                    return false;
+                }
+            }
+        });
 
         $("#editafkModal").on('shown.bs.modal', function(e) {
             let id = $(e.relatedTarget).data('id');
